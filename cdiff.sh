@@ -23,20 +23,17 @@
     while [ "$1" != "" ]; do
         file=`echo "$1" | perl -pe 's|^file:/+|/|i'`
         case "$file" in
-        *.bz2)
-            cat="bzcat"
-            ;;
-        *)
-            cat="zcat -f"
-            ;;
+            *.bz2)   cat="bzip2 -dcf" ;;
+            *.lzma)  cat="lzma -dc"   ;;
+            *)       cat="gzip -dcf"  ;;
         esac
         case `echo "$file" | perl -ne 'print lc $_'` in
         http:*|https:*|ftp:*)
             if [ -z "$CDIFF_FETCH" ]; then
-                if which wget >/dev/null 2>&1; then
-                    CDIFF_FETCH="wget -qO -"
-                elif which curl >/dev/null 2>&1; then
+                if which curl >/dev/null 2>&1; then
                     CDIFF_FETCH="curl -s"
+                elif which wget >/dev/null 2>&1; then
+                    CDIFF_FETCH="wget -e timestamping=off -qO -"
                 elif which lwp-request >/dev/null 2>&1; then
                     CDIFF_FETCH="lwp-request -m GET"
                 elif which lynx >/dev/null 2>&1; then

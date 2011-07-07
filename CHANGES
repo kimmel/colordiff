@@ -93,6 +93,9 @@ Iyer).  Diff-types can now be specified explicitly, for use when diff-type
 detection doesn't work or isn't possible.  Return diff's exit code, patch from
 Tim Connors.  Allow extraneous diff text to be coloured separately.
 
+Changes between version 1.0.8 and 1.0.9
+
+Fix for http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=513313 incorporated
 
 # vim: tw=72
 

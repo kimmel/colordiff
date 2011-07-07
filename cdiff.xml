@@ -22,18 +22,23 @@
 <refsynopsisdiv id='synopsis'>
   <cmdsynopsis>
     <command>cdiff</command>
-    <arg choice='req'><replaceable>URL</replaceable></arg>
+    <arg choice='req'><replaceable>URL|FILE</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
 <refsect1 id='description'><title>Description</title>
 
 <para>&cdiff; is a wrapper for colordiff and will add colour to a diff given
-in a URL, e.g.</para>
+in a URL or a file, e.g.</para>
 
 <screen>
 cdiff http://some.url.com/foo/thing.patch
 </screen>
+
+<para>It also adds support for reading gzip, bzip2 and lzma compressed diffs,
+and like colordiff, also supports reading diffs from standard input if URL
+or a filename is not specified.  &cdiff; pipes colordiff's output through
+less -R.</para>
 
 </refsect1>
 

@@ -1,10 +1,10 @@
 INSTALL_DIR=/usr/local/bin
 MAN_DIR=/usr/local/man/man1
 ETC_DIR=/etc
-VERSION=1.0.8
+VERSION=1.0.9
 DIST_FILES=COPYING INSTALL Makefile README \
 	colordiff.pl colordiffrc colordiffrc-lightbg cdiff.sh BUGS TODO CHANGES colordiff.1 \
-	colordiff.xml cdiff.xml
+	colordiff.xml cdiff.xml cdiff.1
 TMPDIR=colordiff-${VERSION}
 TARBALL=${TMPDIR}.tar.gz
 
@@ -20,28 +20,32 @@ doc: colordiff.xml cdiff.xml
 	perl -p -i -e 's#<div class=\"refentry\"#<div id=\"content\"><div class=\"refentry\"#' colordiff.html
 	mv colordiff.html ../htdocs
 
-etc:
-	sed -e "s%/etc%$(ETC_DIR)%g" colordiff.pl > colordiff.pl.for.install
-
-install: etc
-	install -D colordiff.pl.for.install ${INSTALL_DIR}/colordiff
-	if [ ! -f ${INSTALL_DIR}/cdiff ] ; then \
-	  install cdiff.sh ${INSTALL_DIR}/cdiff; \
+install:
+	install -d ${DESTDIR}${INSTALL_DIR}
+	sed -e "s%/etc%${ETC_DIR}%g" colordiff.pl > \
+	  ${DESTDIR}${INSTALL_DIR}/colordiff
+	chmod +x ${DESTDIR}${INSTALL_DIR}/colordiff
+	if [ ! -f ${DESTDIR}${INSTALL_DIR}/cdiff ] ; then \
+	  install cdiff.sh ${DESTDIR}${INSTALL_DIR}/cdiff; \
 	fi
-	install -D colordiff.1 ${MAN_DIR}/colordiff.1
-	install -D cdiff.1 ${MAN_DIR}/cdiff.1
-	if [ -f ${ETC_DIR}/colordiffrc ]; then \
-	  mv -f ${ETC_DIR}/colordiffrc ${ETC_DIR}/colordiffrc.old; \
+	install -Dm 644 colordiff.1 ${DESTDIR}${MAN_DIR}/colordiff.1
+	install -Dm 644 cdiff.1 ${DESTDIR}${MAN_DIR}/cdiff.1
+	if [ -f ${DESTDIR}${ETC_DIR}/colordiffrc ]; then \
+	  mv -f ${DESTDIR}${ETC_DIR}/colordiffrc \
+	    ${DESTDIR}${ETC_DIR}/colordiffrc.old; \
+	else \
+	  install -d ${DESTDIR}${ETC_DIR}; \
 	fi
-	cp colordiffrc ${ETC_DIR}/colordiffrc
-	chown root.root ${ETC_DIR}/colordiffrc
-	chmod 644 ${ETC_DIR}/colordiffrc
-	rm -f colordiff.pl.for.install
+	cp colordiffrc ${DESTDIR}${ETC_DIR}/colordiffrc
+	-chown root.root ${DESTDIR}${ETC_DIR}/colordiffrc
+	chmod 644 ${DESTDIR}${ETC_DIR}/colordiffrc
 
-uninstall: etc
-	rm -f ${INSTALL_DIR}/colordiff
-	rm -f ${ETC_DIR}/colordiffrc
-	rm -f ${INSTALL_DIR}/cdiff
+uninstall:
+	rm -f ${DESTDIR}${INSTALL_DIR}/colordiff
+	rm -f ${DESTDIR}${ETC_DIR}/colordiffrc
+	rm -f ${DESTDIR}${INSTALL_DIR}/cdiff
+	rm -f ${DESTDIR}${MAN_DIR}/colordiff.1
+	rm -f ${DESTDIR}${MAN_DIR}/cdiff.1
 
 dist:
 	mkdir ${TMPDIR}
