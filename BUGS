@@ -1,0 +1,13 @@
+Bugs and limitations
+
+There is always the possibility of colour selections (either the defaults
+or those chosen by a user) will result in output where the text 'disappears',
+because the foreground and background colours are the same.  There is no way
+to detect terminal colours and so this is always a danger.  See
+http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=368973 - The standard
+workaround is to choose either colordiffrc or colordiffrc-lightbg, as
+appropriate for the colour scheme in use.
+
+Colourising of 'wdiff' output requires that the '-n' option is given, i.e.
+'wdiff -n', which avoids spanning the end of line while showing deleted or
+inserted text.  See 'man wdiff'

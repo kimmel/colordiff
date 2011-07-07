@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+ "/usr/share/sgml/docbook/dtd/xml/4.1.2/docbookx.dtd" [
+ <!ENTITY diff "<command>diff</command>">
+ <!ENTITY colordiff "<application>colordiff</application>">
+]>
+
+<!-- mostly borrowed from bogofilter's bogofilter.xml file, originally
+     by eric raymond -->
+
+<refentry id='colordiff.1'>
+  <refmeta>
+    <refentrytitle>colordiff</refentrytitle>
+    <manvolnum>1</manvolnum>
+  </refmeta>
+
+  <refnamediv id='name'>
+    <refname>colordiff</refname>
+    <refpurpose>a tool to colorize &diff; output</refpurpose>
+  </refnamediv>
+
+<refsynopsisdiv id='synopsis'>
+  <cmdsynopsis>
+    <command>colordiff</command>
+    <arg><replaceable>&diff; options</replaceable></arg>
+    <arg><replaceable>&colordiff; options</replaceable></arg>
+    <arg choice='req'><replaceable>file1</replaceable></arg>
+    <arg choice='req'><replaceable>file2</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+<refsect1 id='description'><title>Description</title>
+
+<para>&colordiff; is a wrapper for &diff; and produces the same output as
+&diff; but with coloured syntax highlighting at the command line to improve
+readability. The output is similar to how a &diff;-generated patch might appear
+in <application>Vim</application> or <application>Emacs</application> with the
+appropriate syntax highlighting options enabled. The colour schemes can be
+read from a central configuration file or from a local user
+<filename>~/.colordiffrc</filename> file.</para>
+
+<para>&colordiff; makes use of ANSI colours and as such will only work when
+ANSI colours can be used - typical examples are xterms and Eterms, as well as
+console sessions.</para>
+
+<para>&colordiff; has been tested on various flavours of Linux and under
+OpenBSD, but should be broadly portable to other systems.</para>
+
+</refsect1>
+
+<refsect1 id="usage"><title>Usage</title>
+
+<para>Use &colordiff; wherever you would normally use &diff;, or pipe output
+to &colordiff;:</para>
+
+<para>For example:
+
+<screen>
+$ colordiff file1 file2
+$ diff -u file1 file2 | colordiff
+</screen>
+
+</para>
+
+<para>You can pipe the output to 'less', using the '-R' option (some systems or
+terminal types may get better results using '-r' instead), which keeps
+the colour escape sequences, otherwise displayed incorrectly or discarded by
+'less':
+
+<screen>
+$ diff -u file1 file2 | colordiff | less -R
+</screen>
+
+</para>
+
+<para>If you have <command>wdiff</command> installed, colordiff will correctly
+colourise the added and removed text, provided that the '-n' option is given to
+<command>wdiff</command>:
+
+<screen>
+$ wdiff -n file1 file2 | colordiff
+</screen>
+
+</para>
+
+<para>You may find it useful to make &diff; automatically call
+<command>colordiff</command>. Add the following line to
+<filename>~/.bashrc</filename> (or equivalent):
+
+<screen>
+alias diff=colordiff
+</screen>
+
+</para>
+
+<para>Any options passed to &colordiff; are passed through to &diff; except for
+the colordiff-specific option 'difftype', e.g.</para>
+
+<screen>
+colordiff --difftype=debdiff file1 file2
+</screen>
+
+<para>Valid values for 'difftype' are: diff, diffc, diffu, diffy, wdiff, debdiff;
+these correspond to plain diffs, context diffs, unified diffs, side-by-side
+diffs, wdiff output and debdiff output respectively.  Use these overrides when
+colordiff is not able to determine the diff-type automatically.</para>
+
+<para>Alternatively, a construct such as 'cvs diff SOMETHING | colordiff' can be
+included in <filename>~/.bashrc</filename> as follows:
+
+<screen>
+function cvsdiff () { cvs diff $@ | colordiff; }
+</screen>
+
+</para>
+
+<para>Or, combining the idea above using 'less':
+
+<screen>
+function cvsdiff () { cvs diff $@ | colordiff |less -R; }
+</screen>
+
+</para>
+
+<para>Note that the function name, cvsdiff, can be customized.</para>
+
+</refsect1>
+
+<refsect1 id='files'><title>Files</title>
+
+<variablelist><varlistentry>
+  <term><filename>/etc/colordiffrc</filename></term>
+  <listitem><para>Central configuration file. User-specific settings can be
+  enabled by copying this file to <filename>~/.colordiffrc</filename> and
+  making the appropriate changes.</para></listitem></varlistentry>
+  <varlistentry><term><filename>colordiffrc-lightbg</filename></term>
+  <listitem><para>Alternate configuration template for use with terminals having
+  light backgrounds.  Copy this to /etc/colordiffrc or ~/.colordiffrc and
+  customize.</para></listitem>
+</varlistentry></variablelist>
+
+</refsect1>
+
+<refsect1 id='bugs'><title>Bugs</title>
+
+<para>Bug reports and suggestions/patches to <email>davee@sungate.co.uk</email>
+please.</para>
+
+</refsect1>
+
+<refsect1 id='author'><title>Author</title>
+
+<para>&colordiff; is written and maintained by Dave Ewart
+<email>davee@sungate.co.uk</email>. This manual page and the
+source XML was written by Graham Wilson <email>graham@mknod.org</email> for
+Debian and is maintained by the author.  Dave Ewart maintains the Debian
+package, sponsored by Graham Wilson.</para>
+
+</refsect1>
+
+</refentry>
+<!-- vim:set ts=2 sw=2 et: -->

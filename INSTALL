@@ -1,0 +1,35 @@
+PREREQUISITES
+
+To use colordiff, you need Perl and an ANSI-colour enabled terminal.  To
+install as per the instructions below, you also need GNU Make.
+
+INSTALLATION (Debian)
+
+All branches of Debian now include the colordiff package, so the easiest
+way to install is simply by doing:
+
+  apt-get install colordiff
+
+You should then setup your colour preferences (see below).
+
+INSTALLATION (Other systems)
+
+1. (Optional) Edit the Makefile to change the preferred installation
+locations - default is /usr/local/bin for the script itself, and /etc
+for the central colour configuration file.
+
+2. As root, type 'make install'.  If 'make' is unavailable, simply copy
+colordiff.pl to /usr/local/bin and colordiffrc to /etc by hand.
+
+3. The central colour configuration file, by default /etc/colordiffrc is
+read by each instance of the script.  User-specific settings can be
+enabled by copying this file to ~/.colordiffrc and making the
+appropriate changes.
+
+Note that by default, colordiff is configured to work in an environment
+where the default background is generally 'dark'.  If you are using a
+light-coloured background, the default colours in colordiffrc won't work
+very well - in that case, manually copy the file colordiffrc-lightbg to
+either /etc/colordiffrc or ~/.colordiffrc as appropriate.
+
+# vim: tw=72

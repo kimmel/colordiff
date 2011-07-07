@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+ "/usr/share/sgml/docbook/dtd/xml/4.1.2/docbookx.dtd" [
+ <!ENTITY diff "<command>diff</command>">
+ <!ENTITY cdiff "<application>cdiff</application>">
+]>
+
+<!-- mostly borrowed from bogofilter's bogofilter.xml file, originally
+     by eric raymond -->
+
+<refentry id='cdiff.1'>
+  <refmeta>
+    <refentrytitle>cdiff</refentrytitle>
+    <manvolnum>1</manvolnum>
+  </refmeta>
+
+  <refnamediv id='name'>
+    <refname>cdiff</refname>
+    <refpurpose>a wrapper tool for colordiff</refpurpose>
+  </refnamediv>
+
+<refsynopsisdiv id='synopsis'>
+  <cmdsynopsis>
+    <command>cdiff</command>
+    <arg choice='req'><replaceable>URL</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+<refsect1 id='description'><title>Description</title>
+
+<para>&cdiff; is a wrapper for colordiff and will add colour to a diff given
+in a URL, e.g.</para>
+
+<screen>
+cdiff http://some.url.com/foo/thing.patch
+</screen>
+
+</refsect1>
+
+<refsect1 id='seealso'><title>See Also</title>
+
+<para>&cdiff; is part of the colordiff package, which should be consulted for
+further reference.</para>
+
+</refsect1>
+
+</refentry>
+
+<!-- vim:set ts=2 sw=2 et: -->
