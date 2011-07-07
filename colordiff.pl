@@ -64,73 +64,76 @@ my $cvs_stuff  = $colour{green};
 # Locations for personal and system-wide colour configurations
 my $HOME   = $ENV{HOME};
 my $etcdir = '/etc';
-my ($setting, $value);
+my ( $setting, $value );
 my @config_files = ("$etcdir/colordiffrc");
-push (@config_files, "$ENV{HOME}/.colordiffrc") if (defined $ENV{HOME});
+push( @config_files, "$ENV{HOME}/.colordiffrc" ) if ( defined $ENV{HOME} );
 my $config_file;
 
 foreach $config_file (@config_files) {
-    if (open (COLORDIFFRC, "<$config_file")) {
+    if ( open( COLORDIFFRC, "<$config_file" ) ) {
         while (<COLORDIFFRC>) {
             my $colourval;
 
             chop;
-            next if (/^#/ || /^$/);
+            next if ( /^#/ || /^$/ );
             s/\s+//g;
-            ($setting, $value) = split ('=');
-            if (!defined $value) {
-                print STDERR "Invalid configuration line ($_) in $config_file\n";
+            ( $setting, $value ) = split('=');
+            if ( !defined $value ) {
+                print STDERR
+                    "Invalid configuration line ($_) in $config_file\n";
                 next;
             }
-            if ($setting eq 'banner') {
-                if ($value eq 'no') {
+            if ( $setting eq 'banner' ) {
+                if ( $value eq 'no' ) {
                     $show_banner = 0;
                 }
                 next;
             }
-            if ($setting eq 'color_patches') {
-                if ($value eq 'yes') {
+            if ( $setting eq 'color_patches' ) {
+                if ( $value eq 'yes' ) {
                     $color_patch = 1;
                 }
                 next;
             }
             $setting =~ tr/A-Z/a-z/;
             $value   =~ tr/A-Z/a-z/;
-            if (($value eq 'normal') || ($value eq 'none')) {
+            if ( ( $value eq 'normal' ) || ( $value eq 'none' ) ) {
                 $value = 'off';
             }
-            if ($value =~ m/[0-9]+/ && $value >= 0 && $value <= 255) {
+            if ( $value =~ m/[0-9]+/ && $value >= 0 && $value <= 255 ) {
+
                 # Numeric color
-                if( $value < 8 ) {
+                if ( $value < 8 ) {
                     $colourval = "\033[0;3${value}m";
                 }
-                elsif( $value < 15 ) {
+                elsif ( $value < 15 ) {
                     $colourval = "\033[0;9${value}m";
                 }
                 else {
                     $colourval = "\033[0;38;5;${value}m";
                 }
             }
-            elsif (defined($colour{$value})) {
+            elsif ( defined( $colour{$value} ) ) {
                 $colourval = $colour{$value};
             }
             else {
-                print STDERR "Invalid colour specification for setting $setting ($value) in $config_file\n";
+                print STDERR
+                    "Invalid colour specification for setting $setting ($value) in $config_file\n";
                 next;
             }
-            if ($setting eq 'plain') {
+            if ( $setting eq 'plain' ) {
                 $plain_text = $colourval;
             }
-            elsif ($setting eq 'oldtext') {
+            elsif ( $setting eq 'oldtext' ) {
                 $file_old = $colourval;
             }
-            elsif ($setting eq 'newtext') {
+            elsif ( $setting eq 'newtext' ) {
                 $file_new = $colourval;
             }
-            elsif ($setting eq 'diffstuff') {
+            elsif ( $setting eq 'diffstuff' ) {
                 $diff_stuff = $colourval;
             }
-            elsif ($setting eq 'cvsstuff') {
+            elsif ( $setting eq 'cvsstuff' ) {
                 $cvs_stuff = $colourval;
             }
             else {
@@ -143,7 +146,7 @@ foreach $config_file (@config_files) {
 
 # If output is to a file, switch off colours, unless 'color_patch' is set
 # Relates to http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=378563
-if ((-f STDOUT) && ($color_patch == 0)) {
+if ( ( -f STDOUT ) && ( $color_patch == 0 ) ) {
     $plain_text  = '';
     $file_old    = '';
     $file_new    = '';
@@ -154,14 +157,13 @@ if ((-f STDOUT) && ($color_patch == 0)) {
 }
 
 my $specified_difftype;
-GetOptions(
-    "difftype=s" => \$specified_difftype
-);
+GetOptions( "difftype=s" => \$specified_difftype );
+
 # TODO - check that specified type is valid, issue warning if not
 
 # ----------------------------------------------------------------------------
 
-if ($show_banner == 1) {
+if ( $show_banner == 1 ) {
     print STDERR "$app_name $version ($app_www)\n";
     print STDERR "$copyright $author, $author_email\n\n";
 }
@@ -176,13 +178,14 @@ if ($show_banner == 1) {
 my @inputstream;
 
 my $exitcode = 0;
-if ((defined $ARGV[0]) || (-t STDIN)) {
+if ( ( defined $ARGV[0] ) || ( -t STDIN ) ) {
+
     # More reliable way of pulling in arguments
-    my $pid = open2(\*INPUTSTREAM, undef, "diff", @ARGV);
+    my $pid = open2( \*INPUTSTREAM, undef, "diff", @ARGV );
     @inputstream = <INPUTSTREAM>;
     close INPUTSTREAM;
     waitpid $pid, 0;
-    $exitcode=$? >> 8;
+    $exitcode = $? >> 8;
 }
 else {
     @inputstream = <STDIN>;
@@ -199,42 +202,47 @@ my $record;
 my $longest_record = 0;
 
 DIFF_TYPE: foreach $record (@inputstream) {
-    if (defined $specified_difftype) {
+    if ( defined $specified_difftype ) {
         $diff_type = $specified_difftype;
         last DIFF_TYPE;
     }
+
     # Unified diffs are the only flavour having '+++' or '---'
     # at the start of a line
-    if ($record =~ /^(\+\+\+|---|@@)/) {
+    if ( $record =~ /^(\+\+\+|---|@@)/ ) {
         $diff_type = 'diffu';
         last DIFF_TYPE;
     }
+
     # Context diffs are the only flavour having '***'
     # at the start of a line
-    elsif ($record =~ /^\*\*\*/) {
+    elsif ( $record =~ /^\*\*\*/ ) {
         $diff_type = 'diffc';
         last DIFF_TYPE;
     }
+
     # Plain diffs have NcN, NdN and NaN etc.
-    elsif ($record =~ /^[0-9,]+[acd][0-9,]+$/) {
+    elsif ( $record =~ /^[0-9,]+[acd][0-9,]+$/ ) {
         $diff_type = 'diff';
         last DIFF_TYPE;
     }
+
     # FIXME - This is not very specific, since the regex matches could
     # easily match non-diff output.
     # However, given that we have not yet matched any of the *other* diff
     # types, this might be good enough
-    elsif ($record =~ /(\s\|\s|\s<$|\s>\s)/) {
+    elsif ( $record =~ /(\s\|\s|\s<$|\s>\s)/ ) {
         $diff_type = 'diffy';
         last DIFF_TYPE;
     }
+
     # wdiff deleted/added patterns
     # should almost always be pairwaise?
-    elsif ($record =~ /\[-.*?-\]/s) {
+    elsif ( $record =~ /\[-.*?-\]/s ) {
         $diff_type = 'wdiff';
         last DIFF_TYPE;
     }
-    elsif ($record =~ /\{\+.*?\+\}/s) {
+    elsif ( $record =~ /\{\+.*?\+\}/s ) {
         $diff_type = 'wdiff';
         last DIFF_TYPE;
     }
@@ -254,63 +262,71 @@ my %candidate_col  = ();
 my $diffy_sep_col  = 0;
 my $mostlikely_sum = 0;
 
-if ($diff_type eq 'diffy') {
+if ( $diff_type eq 'diffy' ) {
+
     # Not very elegant, but does the job
     # Unfortunately requires parsing the input stream multiple times
     foreach (@inputstream) {
+
         # Convert tabs to spaces
-        while ((my $i = index ($_, "\t")) > -1) {
-            substr (
+        while ( ( my $i = index( $_, "\t" ) ) > -1 ) {
+            substr(
                 $_, $i, 1,    # range to replace
-                (' ' x (8 - ($i % 8))),    # string to replace with
+                ( ' ' x ( 8 - ( $i % 8 ) ) ),    # string to replace with
             );
         }
-        $record = $_;
-        $longest_record = length ($record) if (length ($record) > $longest_record);
+        $record         = $_;
+        $longest_record = length($record)
+            if ( length($record) > $longest_record );
     }
-    for (my $i = 0 ; $i <= $longest_record ; $i++) {
+    for ( my $i = 0; $i <= $longest_record; $i++ ) {
         $separator_col{$i} = 1;
         $candidate_col{$i} = 0;
     }
 
     foreach (@inputstream) {
+
         # Convert tabs to spaces
-        while ((my $i = index ($_, "\t")) > -1) {
-            substr (
+        while ( ( my $i = index( $_, "\t" ) ) > -1 ) {
+            substr(
                 $_, $i, 1,    # range to replace
-                (' ' x (8 - ($i % 8))),    # string to replace with
+                ( ' ' x ( 8 - ( $i % 8 ) ) ),    # string to replace with
             );
         }
-        for (my $i = 0 ; $i < (length ($_) - 2) ; $i++) {
-            next if (!defined $separator_col{$i});
-            next if ($separator_col{$i} == 0);
-            my $subsub = substr ($_, $i, 2);
-            if (   ($subsub ne '  ')
-                && ($subsub ne ' |')
-                && ($subsub ne ' >')
-                && ($subsub ne ' <'))
+        for ( my $i = 0; $i < ( length($_) - 2 ); $i++ ) {
+            next if ( !defined $separator_col{$i} );
+            next if ( $separator_col{$i} == 0 );
+            my $subsub = substr( $_, $i, 2 );
+            if (   ( $subsub ne '  ' )
+                && ( $subsub ne ' |' )
+                && ( $subsub ne ' >' )
+                && ( $subsub ne ' <' ) )
             {
                 $separator_col{$i} = 0;
             }
-            if (($subsub eq ' |') || ($subsub eq ' >') || ($subsub eq ' <')) {
+            if (   ( $subsub eq ' |' )
+                || ( $subsub eq ' >' )
+                || ( $subsub eq ' <' ) )
+            {
                 $candidate_col{$i}++;
             }
         }
     }
 
-    for (my $i = 0 ; $i < $longest_record - 2 ; $i++) {
-        if ($separator_col{$i} == 1) {
-            if ($candidate_col{$i} > $mostlikely_sum) {
+    for ( my $i = 0; $i < $longest_record - 2; $i++ ) {
+        if ( $separator_col{$i} == 1 ) {
+            if ( $candidate_col{$i} > $mostlikely_sum ) {
                 $diffy_sep_col  = $i;
                 $mostlikely_sum = $i;
             }
         }
     }
 }
+
 # ------------------------------------------------------------------------------
 
 foreach (@inputstream) {
-    if ($diff_type eq 'diff') {
+    if ( $diff_type eq 'diff' ) {
         if (/^</) {
             print "$file_old";
         }
@@ -330,7 +346,7 @@ foreach (@inputstream) {
             print "$plain_text";
         }
     }
-    elsif ($diff_type eq 'diffc') {
+    elsif ( $diff_type eq 'diffc' ) {
         if (/^- /) {
             print "$file_old";
         }
@@ -358,7 +374,7 @@ foreach (@inputstream) {
             print "$file_new";
         }
         elsif (/^!/) {
-            if ($inside_file_old == 1) {
+            if ( $inside_file_old == 1 ) {
                 print "$file_old";
             }
             else {
@@ -372,7 +388,7 @@ foreach (@inputstream) {
             print "$plain_text";
         }
     }
-    elsif ($diff_type eq 'diffu') {
+    elsif ( $diff_type eq 'diffu' ) {
         if (/^-/) {
             print "$file_old";
         }
@@ -392,18 +408,19 @@ foreach (@inputstream) {
             print "$plain_text";
         }
     }
+
     # Works with previously-identified column containing the diff-y
     # separator characters
-    elsif ($diff_type eq 'diffy') {
-        if (length ($_) > ($diffy_sep_col + 2)) {
-            my $sepchars = substr ($_, $diffy_sep_col, 2);
-            if ($sepchars eq ' <') {
+    elsif ( $diff_type eq 'diffy' ) {
+        if ( length($_) > ( $diffy_sep_col + 2 ) ) {
+            my $sepchars = substr( $_, $diffy_sep_col, 2 );
+            if ( $sepchars eq ' <' ) {
                 print "$file_old";
             }
-            elsif ($sepchars eq ' |') {
+            elsif ( $sepchars eq ' |' ) {
                 print "$diff_stuff";
             }
-            elsif ($sepchars eq ' >') {
+            elsif ( $sepchars eq ' >' ) {
                 print "$file_new";
             }
             else {
@@ -417,11 +434,11 @@ foreach (@inputstream) {
             print "$plain_text";
         }
     }
-    elsif ($diff_type eq 'wdiff') {
+    elsif ( $diff_type eq 'wdiff' ) {
         $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
         $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
     }
-    elsif ($diff_type eq 'debdiff') {
+    elsif ( $diff_type eq 'debdiff' ) {
         $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
         $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
     }
