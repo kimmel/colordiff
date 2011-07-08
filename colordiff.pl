@@ -21,11 +21,67 @@
 #                                                                      #
 ########################################################################
 
+use 5.008_000;
 use warnings;
 use strict;
+use English qw( -no_match_vars );
 use Getopt::Long qw(:config pass_through);
 use IPC::Open2;
 use Term::ANSIColor qw(:constants color);;
+use Module::Load::Conditional qw( can_load );
+
+#pull in Perl 6 given/when
+use feature qw(:5.10);
+
+if ( $PERL_VERSION < v5.12 ) {
+    can_load( modules => { 'Switch' => '2.09', }, verbose => 1 );
+}
+
+# ----------------------------------------------------------------------------
+sub determine_diff_type {
+    my $user_difftype = shift;
+    my $input_ref = shift;
+    my $diff_type = 'unknown';
+
+DIFF_TYPE: foreach my $record (@{$input_ref}) {
+        if ( defined $user_difftype ) {
+            $diff_type = $user_difftype;
+            last DIFF_TYPE;
+        }
+
+        given ($record) {
+
+            # Unified diffs are the only flavour having '+++' or '---'
+            # at the start of a line
+            when (m/^([+]{3}|---|@@)/xms) { $diff_type = 'diffu'; }
+
+            # Context diffs are the only flavour having '***'
+            # at the start of a line
+            when (m/^[*]{3}/xms) { $diff_type = 'diffc'; }
+
+            # Plain diffs have NcN, NdN and NaN etc.
+            when (m/^[0-9,]+[acd][0-9,]+$/xs) { $diff_type = 'diff'; }
+
+         # FIXME - This is not very specific, since the regex matches could
+         # easily match non-diff output.
+         # However, given that we have not yet matched any of the *other* diff
+         # types, this might be good enough
+            when (m/(\s\|\s|\s<$|\s>\s)/x) { $diff_type = 'diffy'; }
+
+            # wdiff deleted/added patterns
+            # should almost always be pairwaise?
+            when (m/\[-.*?-\]/xs)   { $diff_type = 'wdiff'; }
+            when (m/\{\+.*?\+\}/xs) { $diff_type = 'wdiff'; }
+        }
+
+        if ( $diff_type ne 'unknown' ) {
+            last DIFF_TYPE;
+        }
+    }
+
+    return $diff_type;
+}
+
 
 my $app_name     = 'colordiff';
 my $version      = '1.0.9';
@@ -78,7 +134,7 @@ foreach my $config_file (@config_files) {
             my $colourval;
 
             chop;
-            next if ( /^#/ms || /^$/xms );
+            next if ( /^[#]/xms || /^$/xms );
             s/\s+//g;
             ( $setting, $value ) = split '=';
             if ( !defined $value ) {
@@ -184,11 +240,11 @@ my $exitcode = 0;
 if ( ( defined $ARGV[0] ) || ( -t STDIN ) ) {
 
     # More reliable way of pulling in arguments
-    my $pid = open2( \*INPUTSTREAM, undef, "diff", @ARGV );
+    my $pid = open2( \*INPUTSTREAM, undef, 'diff', @ARGV );
     @inputstream = <INPUTSTREAM>;
     close INPUTSTREAM;
     waitpid $pid, 0;
-    $exitcode = $? >> 8;
+    $exitcode = $CHILD_ERROR >> 8;
 }
 else {
     @inputstream = <STDIN>;
@@ -200,55 +256,10 @@ else {
 # This may not be perfect - should identify most reasonably
 # formatted diffs and patches
 
-my $diff_type      = 'unknown';
+
 my $longest_record = 0;
 
-DIFF_TYPE: foreach my $record (@inputstream) {
-    if ( defined $specified_difftype ) {
-        $diff_type = $specified_difftype;
-        last DIFF_TYPE;
-    }
-
-    # Unified diffs are the only flavour having '+++' or '---'
-    # at the start of a line
-    if ( $record =~ /^(\+\+\+|---|@@)/ ) {
-        $diff_type = 'diffu';
-        last DIFF_TYPE;
-    }
-
-    # Context diffs are the only flavour having '***'
-    # at the start of a line
-    elsif ( $record =~ /^\*\*\*/ ) {
-        $diff_type = 'diffc';
-        last DIFF_TYPE;
-    }
-
-    # Plain diffs have NcN, NdN and NaN etc.
-    elsif ( $record =~ /^[0-9,]+[acd][0-9,]+$/ ) {
-        $diff_type = 'diff';
-        last DIFF_TYPE;
-    }
-
-    # FIXME - This is not very specific, since the regex matches could
-    # easily match non-diff output.
-    # However, given that we have not yet matched any of the *other* diff
-    # types, this might be good enough
-    elsif ( $record =~ /(\s\|\s|\s<$|\s>\s)/ ) {
-        $diff_type = 'diffy';
-        last DIFF_TYPE;
-    }
-
-    # wdiff deleted/added patterns
-    # should almost always be pairwaise?
-    elsif ( $record =~ /\[-.*?-\]/s ) {
-        $diff_type = 'wdiff';
-        last DIFF_TYPE;
-    }
-    elsif ( $record =~ /\{\+.*?\+\}/s ) {
-        $diff_type = 'wdiff';
-        last DIFF_TYPE;
-    }
-}
+my $diff_type = determine_diff_type( $specified_difftype, \@inputstream );
 
 my $inside_file_old = 1;
 
@@ -440,7 +451,7 @@ foreach (@inputstream) {
         $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
         $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
     }
-    s/$/$colour{off}/;
+    s/$/$colour{off}/xs;
     
     print $_;
 }
