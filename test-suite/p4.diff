@@ -1,0 +1,11 @@
+==== //eng/main/src/perl/third/Proc-Simple-1.19/Simple.pm#1 (binary+D) - //eng/main/src/perl/third/Proc-Simple-1.19/Simple.pm#6 (text) ==== content
+24c24,30
+<    $myproc = Proc::Simple->new();        # Create a new process object
+---
+>    $myproc = Proc::Simple->new(reap_only_on_poll => 0);
+>                                          # Create a new process object
+> 
+>    $myproc = Proc::Simple->new();
+>                                          # Create a new process object
+>                                          # with THE_REAPER sigchld handler
+>                                          # disabled. SEE WARNING BELOW
