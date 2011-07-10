@@ -27,7 +27,7 @@ use strict;
 use English qw( -no_match_vars );
 use Getopt::Long qw(:config pass_through);
 use IPC::Open2;
-use Term::ANSIColor qw(:constants color);;
+use Term::ANSIColor qw(:constants color);
 use Module::Load::Conditional qw( can_load );
 
 #pull in Perl 6 given/when
@@ -37,13 +37,12 @@ if ( $PERL_VERSION < v5.12 ) {
     can_load( modules => { 'Switch' => '2.09', }, verbose => 1 );
 }
 
-# ----------------------------------------------------------------------------
 sub determine_diff_type {
     my $user_difftype = shift;
-    my $input_ref = shift;
-    my $diff_type = 'unknown';
+    my $input_ref     = shift;
+    my $diff_type     = 'unknown';
 
-DIFF_TYPE: foreach my $record (@{$input_ref}) {
+DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
         if ( defined $user_difftype ) {
             $diff_type = $user_difftype;
             last DIFF_TYPE;
@@ -53,14 +52,14 @@ DIFF_TYPE: foreach my $record (@{$input_ref}) {
 
             # Unified diffs are the only flavour having '+++' or '---'
             # at the start of a line
-            when (m/^([+]{3}|---|@@)/xms) { $diff_type = 'diffu'; }
+            when (m/^(?:[+]{3}|---|@@)/xms) { $diff_type = 'diffu'; }
 
             # Context diffs are the only flavour having '***'
             # at the start of a line
             when (m/^[*]{3}/xms) { $diff_type = 'diffc'; }
 
             # Plain diffs have NcN, NdN and NaN etc.
-            when (m/^[0-9,]+[acd][0-9,]+$/xs) { $diff_type = 'diff'; }
+            when (m/^\d+[acd]\d+$/xs) { $diff_type = 'diff'; }
 
          # FIXME - This is not very specific, since the regex matches could
          # easily match non-diff output.
@@ -82,27 +81,27 @@ DIFF_TYPE: foreach my $record (@{$input_ref}) {
     return $diff_type;
 }
 
-
+# ----------------------------------------------------------------------------
 my $app_name     = 'colordiff';
-my $version      = '1.0.9';
+my $version      = '2.0.0';
 my $author       = 'Dave Ewart';
 my $author_email = 'davee@sungate.co.uk';
 my $app_www      = 'http://colordiff.sourceforge.net/';
-my $copyright    = '(C)2002-2009';
+my $copyright    = '(C)2002-2011';
 my $show_banner  = 1;
 my $color_patch  = 0;
 
 # ANSI sequences for colours
 my %colour = (
-    'white'       => "\033[1;37m",
-    'yellow'      => "\033[1;33m",
-    'green'       => "\033[1;32m",
-    'blue'        => "\033[1;34m",
-    'cyan'        => "\033[1;36m",
-    'red'         => "\033[1;31m",
-    'magenta'     => "\033[1;35m",
-    'black'       => "\033[1;30m",
-    
+    'white'   => "\033[1;37m",
+    'yellow'  => "\033[1;33m",
+    'green'   => "\033[1;32m",
+    'blue'    => "\033[1;34m",
+    'cyan'    => "\033[1;36m",
+    'red'     => "\033[1;31m",
+    'magenta' => "\033[1;35m",
+    'black'   => "\033[1;30m",
+
     'darkwhite'   => "\033[0;37m",
     'darkyellow'  => "\033[0;33m",
     'darkgreen'   => "\033[0;32m",
@@ -134,7 +133,7 @@ foreach my $config_file (@config_files) {
             my $colourval;
 
             chop;
-            next if ( /^[#]/xms || /^$/xms );
+            next if ( m/^[#]/xms || m/^$/xms );
             s/\s+//g;
             ( $setting, $value ) = split '=';
             if ( !defined $value ) {
@@ -159,7 +158,7 @@ foreach my $config_file (@config_files) {
             if ( ( $value eq 'normal' ) || ( $value eq 'none' ) ) {
                 $value = 'off';
             }
-            if ( $value =~ m/[0-9]+/ && $value >= 0 && $value <= 255 ) {
+            if ( $value =~ m/\d+/xms && $value >= 0 && $value <= 255 ) {
 
                 # Numeric color
                 if ( $value < 8 ) {
@@ -206,13 +205,13 @@ foreach my $config_file (@config_files) {
 # If output is to a file, switch off colours, unless 'color_patch' is set
 # Relates to http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=378563
 if ( ( -f STDOUT ) && ( $color_patch == 0 ) ) {
-    $plain_text  = '';
-    $file_old    = '';
-    $file_new    = '';
-    $diff_stuff  = '';
-    $cvs_stuff   = '';
-    $plain_text  = '';
-    $colour{off} = '';
+    $plain_text  = q{};
+    $file_old    = q{};
+    $file_new    = q{};
+    $diff_stuff  = q{};
+    $cvs_stuff   = q{};
+    $plain_text  = q{};
+    $colour{off} = q{};
 }
 
 my $specified_difftype;
@@ -250,18 +249,17 @@ else {
     @inputstream = <STDIN>;
 }
 
+#use Data::Dumper;
+#print Dumper @inputstream;
+#die;
+
 # Input stream has been read - need to examine it
 # to determine type of diff we have.
 #
 # This may not be perfect - should identify most reasonably
 # formatted diffs and patches
 
-
-my $longest_record = 0;
-
 my $diff_type = determine_diff_type( $specified_difftype, \@inputstream );
-
-my $inside_file_old = 1;
 
 # ------------------------------------------------------------------------------
 # Special pre-processing for side-by-side diffs
@@ -274,23 +272,25 @@ my %separator_col  = ();
 my %candidate_col  = ();
 my $diffy_sep_col  = 0;
 my $mostlikely_sum = 0;
+my $longest_record = 0;
 
 if ( $diff_type eq 'diffy' ) {
 
     # Not very elegant, but does the job
     # Unfortunately requires parsing the input stream multiple times
-    foreach (@inputstream) {
+    foreach my $line (@inputstream) {
 
         # Convert tabs to spaces
-        while ( ( my $i = index $_, "\t" ) > -1 ) {
-            substr $_, $i, 1,    # range to replace
-                ( ' ' x ( 8 - ( $i % 8 ) ) );    # string to replace with
+        while ( ( my $i = index $line, "\t" ) > -1 ) {
+            substr $line, $i, 1,    # range to replace
+                ( q{ } x ( 8 - ( $i % 8 ) ) );    # string to replace with
         }
-        my $record = $_;
-        $longest_record = length $record
-            if ( length($record) > $longest_record );
+        if ( length($line) > $longest_record ) {
+            $longest_record = length $line;
+        }
     }
-    for ( my $i = 0; $i <= $longest_record; $i++ ) {
+
+    for my $i ( 0 .. $longest_record ) {
         $separator_col{$i} = 1;
         $candidate_col{$i} = 0;
     }
@@ -300,13 +300,13 @@ if ( $diff_type eq 'diffy' ) {
         # Convert tabs to spaces
         while ( ( my $i = index $_, "\t" ) > -1 ) {
             substr $_, $i, 1,    # range to replace
-                ( ' ' x ( 8 - ( $i % 8 ) ) );    # string to replace with
+                ( q{ } x ( 8 - ( $i % 8 ) ) );    # string to replace with
         }
-        for ( my $i = 0; $i < ( length($_) - 2 ); $i++ ) {
+        for my $i ( 0 .. ( length($_) - 3 ) ) {
             next if ( !defined $separator_col{$i} );
             next if ( $separator_col{$i} == 0 );
             my $subsub = substr $_, $i, 2;
-            if (   ( $subsub ne '  ' )
+            if (   ( $subsub ne q{  } )
                 && ( $subsub ne ' |' )
                 && ( $subsub ne ' >' )
                 && ( $subsub ne ' <' ) )
@@ -322,7 +322,7 @@ if ( $diff_type eq 'diffy' ) {
         }
     }
 
-    for ( my $i = 0; $i < $longest_record - 2; $i++ ) {
+    for my $i ( 0 .. ( $longest_record - 3 ) ) {
         if ( $separator_col{$i} == 1 ) {
             if ( $candidate_col{$i} > $mostlikely_sum ) {
                 $diffy_sep_col  = $i;
@@ -334,87 +334,67 @@ if ( $diff_type eq 'diffy' ) {
 
 # ------------------------------------------------------------------------------
 
+my $inside_file_old = 1;
+
 foreach (@inputstream) {
     if ( $diff_type eq 'diff' ) {
-        if (/^</) {
-            print $file_old;
-        }
-        elsif (/^>/) {
-            print $file_new;
-        }
-        elsif (/^[0-9]/) {
-            print $diff_stuff;
-        }
-        elsif (/^(Index: |={4,}|RCS file: |retrieving |diff )/) {
-            print $cvs_stuff;
-        }
-        elsif (/^Only in/) {
-            print $diff_stuff;
-        }
-        else {
-            print $plain_text;
+        given ($_) {
+            when (m/^</xms)  { print $file_old; }
+            when (m/^>/xms)  { print $file_new; }
+            when (m/^\d/xms) { print $diff_stuff; }
+            when (
+                m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
+                )
+            {
+                print $cvs_stuff;
+            }
+            when (m/^Only[ ]in/xms) { print $diff_stuff; }
+            default                 { print $plain_text; }
         }
     }
     elsif ( $diff_type eq 'diffc' ) {
-        if (/^- /) {
-            print $file_old;
-        }
-        elsif (/^\+ /) {
-            print $file_new;
-        }
-        elsif (/^\*{4,}/) {
-            print $diff_stuff;
-        }
-        elsif (/^Only in/) {
-            print $diff_stuff;
-        }
-        elsif (/^\*\*\* [0-9]+,[0-9]+/) {
-            print $diff_stuff;
-            $inside_file_old = 1;
-        }
-        elsif (/^\*\*\* /) {
-            print $file_old;
-        }
-        elsif (/^--- [0-9]+,[0-9]+/) {
-            print $diff_stuff;
-            $inside_file_old = 0;
-        }
-        elsif (/^--- /) {
-            print $file_new;
-        }
-        elsif (/^!/) {
-            if ( $inside_file_old == 1 ) {
-                print $file_old;
+        given ($_) {
+            when (m/^-[ ]/xms)      { print $file_old; }
+            when (m/^[+][ ]/xms)    { print $file_new; }
+            when (m/^[*]{4,}/xms)   { print $diff_stuff; }
+            when (m/^Only[ ]in/xms) { print $diff_stuff; }
+            when (m/^[*]{3}[ ]\d+,\d+/xms) {
+                print $diff_stuff;
+                $inside_file_old = 1;
             }
-            else {
-                print $file_new;
+            when (m/^[*]{3}[ ]/xms) { print $file_old; }
+            when (m/^---[ ]\d+,\d+/xms) {
+                print $diff_stuff;
+                $inside_file_old = 0;
             }
-        }
-        elsif (/^(Index: |={4,}|RCS file: |retrieving |diff )/) {
-            print $cvs_stuff;
-        }
-        else {
-            print "$plain_text";
+            when (m/^---[ ]/xms) { print $file_new; }
+            when (m/^!/xms) {
+                $inside_file_old == 1
+                    ? print $file_old
+                    : print $file_new;
+            }
+            when (
+                m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
+                )
+            {
+                print $cvs_stuff;
+            }
+            default { print $plain_text; }
         }
     }
     elsif ( $diff_type eq 'diffu' ) {
-        if (/^-/) {
-            print $file_old;
-        }
-        elsif (/^\+/) {
-            print $file_new;
-        }
-        elsif (/^\@/) {
-            print $diff_stuff;
-        }
-        elsif (/^Only in/) {
-            print $diff_stuff;
-        }
-        elsif (/^(Index: |={4,}|RCS file: |retrieving |diff )/) {
-            print $cvs_stuff;
-        }
-        else {
-            print "$plain_text";
+        given ($_) {
+            when (m/^-/xms)         { print $file_old; }
+            when (m/^[+]/xms)       { print $file_new; }
+            when (m/^[@]/xms)       { print $diff_stuff; }
+            when (m/^Only[ ]in/xms) { print $diff_stuff; }
+            when (
+                m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
+                )
+            {
+                print $cvs_stuff;
+            }
+            default { print $plain_text; }
         }
     }
 
@@ -436,7 +416,7 @@ foreach (@inputstream) {
                 print "$plain_text";
             }
         }
-        elsif (/^Only in/) {
+        elsif (m/^Only[ ]in/xms) {
             print $diff_stuff;
         }
         else {
@@ -444,16 +424,15 @@ foreach (@inputstream) {
         }
     }
     elsif ( $diff_type eq 'wdiff' ) {
-        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
-        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
+        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/gms;
+        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/gms;
     }
     elsif ( $diff_type eq 'debdiff' ) {
-        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
-        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
+        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/gms;
+        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/gms;
     }
-    s/$/$colour{off}/xs;
-    
-    print $_;
+
+    print $_, color 'reset';
 }
 
 exit $exitcode;
