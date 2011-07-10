@@ -1,0 +1,41 @@
+Index: colordiff.pl
+===================================================================
+--- colordiff.pl	(revision 80)
++++ colordiff.pl	(working copy)
+@@ -3,6 +3,7 @@
+ # $Id: svn.diff,v 1.1.2.1 2003/03/18 15:08:54 daveewart Exp $
+ 
+ ########################################################################
++hello
+ #                                                                      #
+ # ColorDiff - a wrapper/replacment for 'diff' producing                #
+ #             colourful output                                         #
+@@ -142,20 +143,6 @@
+         elsif (/^diff /) {
+             $diff_type = 'basic';
+         }
+-    }
+-    elsif ($diff_type eq 'c') {
+-        if ($nrecs == 1) {
+-            print "$file_old";
+-        }
+-        elsif ($nrecs == 2) {
+-                print "$file_new";
+-        }
+-        elsif (/^- /) {
+-            print "$file_old";
+-        }
+-        elsif (/^\+ /) {
+-            print "$file_new";
+-        }
+         elsif (/^\*{4,}/) {
+             print "$diff_start";
+         }
+@@ -192,6 +179,7 @@
+         else {
+             print "$plain_text";
+         }
++    world
+     }
+     elsif ($diff_type eq 'basic') {
+         if (/^</) {

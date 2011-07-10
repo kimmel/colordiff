@@ -1,0 +1,9 @@
+Index: colordiff.pl
+===================================================================
+RCS file: /cvsroot/colordiff/colordiff/src/colordiff.pl,v
+retrieving revision 1.4.2.2
+diff -r1.4.2.2 colordiff.pl
+33c33
+< my $version      = '1.0.1';
+---
+> my $version      = '1.0.2';

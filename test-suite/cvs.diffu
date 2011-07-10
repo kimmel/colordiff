@@ -1,0 +1,16 @@
+Index: colordiff.pl
+===================================================================
+RCS file: /cvsroot/colordiff/colordiff/src/colordiff.pl,v
+retrieving revision 1.4.2.2
+diff -u -r1.4.2.2 colordiff.pl
+--- colordiff.pl	6 Mar 2003 13:41:12 -0000	1.4.2.2
++++ colordiff.pl	18 Mar 2003 10:56:09 -0000
+@@ -30,7 +30,7 @@
+ use strict;
+ 
+ my $app_name     = 'colordiff';
+-my $version      = '1.0.1';
++my $version      = '1.0.2';
+ my $author       = 'Dave Ewart';
+ my $author_email = 'davee@sungate.co.uk';
+ my $app_www      = 'http://colordiff.sourceforge.net/';
