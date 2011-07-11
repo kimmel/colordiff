@@ -29,6 +29,7 @@ use Getopt::Long qw(:config pass_through);
 use IPC::Open2;
 use Term::ANSIColor qw(:constants color);
 use Module::Load::Conditional qw( can_load );
+use Data::Dumper;
 
 #pull in Perl 6 given/when
 use feature qw(:5.10);
@@ -59,13 +60,13 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
             when (m/^[*]{3}/xms) { $diff_type = 'diffc'; }
 
             # Plain diffs have NcN, NdN and NaN etc.
-            when (m/^\d+[acd]\d+$/xs) { $diff_type = 'diff'; }
+            when (m/^\d+[acd]\d+$/xms) { $diff_type = 'diff'; }
 
          # FIXME - This is not very specific, since the regex matches could
          # easily match non-diff output.
          # However, given that we have not yet matched any of the *other* diff
          # types, this might be good enough
-            when (m/(\s\|\s|\s<$|\s>\s)/x) { $diff_type = 'diffy'; }
+            when (m/(?:\s[|]\s|\s<$|\s>\s)/xms) { $diff_type = 'diffy'; }
 
             # wdiff deleted/added patterns
             # should almost always be pairwaise?
@@ -123,18 +124,18 @@ my $cvs_stuff  = $colour{green};
 # Locations for personal and system-wide colour configurations
 my $HOME   = $ENV{HOME};
 my $etcdir = '/etc';
-my ( $setting, $value );
 my @config_files = ("$etcdir/colordiffrc");
 push @config_files, "$ENV{HOME}/.colordiffrc" if ( defined $ENV{HOME} );
 
 foreach my $config_file (@config_files) {
+    my ( $setting, $value );
     if ( open my $COLORDIFFRC, '<', $config_file ) {
         while (<$COLORDIFFRC>) {
             my $colourval;
 
             chop;
             next if ( m/^[#]/xms || m/^$/xms );
-            s/\s+//g;
+            s/\s+//gxms;
             ( $setting, $value ) = split '=';
             if ( !defined $value ) {
                 print STDERR
@@ -179,28 +180,19 @@ foreach my $config_file (@config_files) {
                     "Invalid colour specification for setting $setting ($value) in $config_file\n";
                 next;
             }
-            if ( $setting eq 'plain' ) {
-                $plain_text = $colourval;
-            }
-            elsif ( $setting eq 'oldtext' ) {
-                $file_old = $colourval;
-            }
-            elsif ( $setting eq 'newtext' ) {
-                $file_new = $colourval;
-            }
-            elsif ( $setting eq 'diffstuff' ) {
-                $diff_stuff = $colourval;
-            }
-            elsif ( $setting eq 'cvsstuff' ) {
-                $cvs_stuff = $colourval;
-            }
-            else {
-                print STDERR "Unknown option in $config_file: $setting\n";
+
+            given ($setting) {
+                when ('plain') { $plain_text = $colourval; }
+                when ('oldtext') { $file_old = $colourval; }
+                when ('newtext') { $file_new = $colourval; }
+                when ('diffstuff') { $diff_stuff = $colourval; }
+                when ('cvsstuff') { $cvs_stuff = $colourval; }
+                default { print STDERR "Unknown option in $config_file: $setting\n"; }
             }
         }
         close $COLORDIFFRC;
-    }
-}
+    } #end if open 
+} #end foreach @config_files
 
 # If output is to a file, switch off colours, unless 'color_patch' is set
 # Relates to http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=378563
@@ -249,7 +241,6 @@ else {
     @inputstream = <STDIN>;
 }
 
-#use Data::Dumper;
 #print Dumper @inputstream;
 #die;
 
