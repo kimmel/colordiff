@@ -29,7 +29,6 @@ use Getopt::Long qw(:config pass_through);
 use IPC::Open2;
 use Term::ANSIColor qw(:constants color);
 use Module::Load::Conditional qw( can_load );
-use Data::Dumper;
 
 #pull in Perl 6 given/when
 use feature qw(:5.10);
@@ -89,7 +88,6 @@ my $author       = 'Dave Ewart';
 my $author_email = 'davee@sungate.co.uk';
 my $app_www      = 'http://colordiff.sourceforge.net/';
 my $copyright    = '(C)2002-2011';
-my $show_banner  = 1;
 my $color_patch  = 0;
 
 # ANSI sequences for colours
@@ -127,6 +125,8 @@ my $etcdir = '/etc';
 my @config_files = ("$etcdir/colordiffrc");
 push @config_files, "$ENV{HOME}/.colordiffrc" if ( defined $ENV{HOME} );
 
+my $show_banner = 1;
+
 foreach my $config_file (@config_files) {
     my ( $setting, $value );
     if ( open my $COLORDIFFRC, '<', $config_file ) {
@@ -134,17 +134,25 @@ foreach my $config_file (@config_files) {
             my $colourval;
 
             chop;
-            next if ( m/^[#]/xms || m/^$/xms );
             s/\s+//gxms;
+            next if ( m/^[#]/xms || m/^$/xms );
+            
             ( $setting, $value ) = split '=';
             if ( !defined $value ) {
                 print STDERR
                     "Invalid configuration line ($_) in $config_file\n";
                 next;
             }
+
+            $setting =~ tr/A-Z/a-z/;
+            $value   =~ tr/A-Z/a-z/;
+
             if ( $setting eq 'banner' ) {
                 if ( $value eq 'no' ) {
                     $show_banner = 0;
+                } 
+                elsif ($value eq 'yes' ) {
+                  $show_banner = 1;
                 }
                 next;
             }
@@ -154,14 +162,15 @@ foreach my $config_file (@config_files) {
                 }
                 next;
             }
-            $setting =~ tr/A-Z/a-z/;
-            $value   =~ tr/A-Z/a-z/;
+
+
             if ( ( $value eq 'normal' ) || ( $value eq 'none' ) ) {
                 $value = 'off';
             }
-            if ( $value =~ m/\d+/xms && $value >= 0 && $value <= 255 ) {
 
-                # Numeric color
+            #256 color support via specifiying the number in colordiffrc
+            if ( $value =~ m/\d+/xms && $value >= 0 && $value <= 255 ) {
+                
                 if ( $value < 8 ) {
                     $colourval = "\033[0;3${value}m";
                 }
@@ -208,10 +217,7 @@ if ( ( -f STDOUT ) && ( $color_patch == 0 ) ) {
 
 my $specified_difftype;
 GetOptions( "difftype=s" => \$specified_difftype );
-
 # TODO - check that specified type is valid, issue warning if not
-
-# ----------------------------------------------------------------------------
 
 if ( $show_banner == 1 ) {
     print STDERR "$app_name $version ($app_www)\n";
@@ -241,8 +247,6 @@ else {
     @inputstream = <STDIN>;
 }
 
-#print Dumper @inputstream;
-#die;
 
 # Input stream has been read - need to examine it
 # to determine type of diff we have.
