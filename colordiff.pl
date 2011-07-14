@@ -5,7 +5,7 @@
 # ColorDiff - a wrapper/replacment for 'diff' producing                #
 #             colourful output                                         #
 #                                                                      #
-# Copyright (C)2002-2009 Dave Ewart (davee@sungate.co.uk)              #
+# Copyright (C)2002-2011 Dave Ewart (davee@sungate.co.uk)              #
 #                                                                      #
 ########################################################################
 #                                                                      #
