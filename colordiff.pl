@@ -85,21 +85,21 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
 }
 
 sub show_banner {
-  my $display = shift;
-  
-  exit if ($display == 0);
-  
-  my $app_name     = 'colordiff';
-  my $version      = '2.0.0';
-  my $author       = 'Dave Ewart';
-  my $author_email = 'davee@sungate.co.uk';
-  my $app_www      = 'http://colordiff.sourceforge.net/';
-  my $copyright    = '(C)2002-2011';
+    my $display = shift;
 
-  print STDERR "$app_name $version ($app_www)\n";
-  print STDERR "$copyright $author, $author_email\n\n";
-  
-  return 0;
+    exit if ( $display == 0 );
+
+    my $app_name     = 'colordiff';
+    my $version      = '2.0.0';
+    my $author       = 'Dave Ewart';
+    my $author_email = 'davee@sungate.co.uk';
+    my $app_www      = 'http://colordiff.sourceforge.net/';
+    my $copyright    = '(C)2002-2011';
+
+    print {*STDERR} "$app_name $version ($app_www)\n";
+    print {*STDERR} "$copyright $author, $author_email\n\n";
+
+    return 0;
 }
 
 sub parse_config_file {
@@ -114,8 +114,7 @@ sub parse_config_file {
     open my $fh, '<', $location || croak "Cannot open $location: $OS_ERROR";
     my @contents = <$fh>;
     close $fh || croak "Cannot open $location: $OS_ERROR";
-    
-    #while ( my $line = <$fh> ) {
+
     foreach my $line (@contents) {
         my $colourval;
         chomp $line;
@@ -125,8 +124,7 @@ sub parse_config_file {
 
         my ( $option, $value ) = split /=/xms, $line;
         if ( !defined $value ) {
-            print {*STDERR}
-                "$location Invalid configuration pair: '$line'\n";
+            print {*STDERR} "$location Invalid configuration pair: '$line'\n";
             next;
         }
 
@@ -179,7 +177,10 @@ sub parse_config_file {
             when ('diffstuff') { $settings{diff_stuff} = $colourval; }
             when ('cvsstuff')  { $settings{cvs_stuff}  = $colourval; }
             default {
-                print {*STDERR} "Unknown option in $location: $option\n";
+                print {
+                    *STDERR
+                }
+                "Unknown option in $location: $option\n";
             }
         }
     }
@@ -213,11 +214,11 @@ my %colour = (
 
 # Default settings if /etc/colordiffrc or ~/.colordiffrc do not exist.
 my %settings = (
-    'plain_text' => $colour{white},
-    'file_old'   => $colour{red},
-    'file_new'   => $colour{blue},
-    'diff_stuff' => $colour{magenta},
-    'cvs_stuff'  => $colour{green},
+    'plain_text'  => $colour{white},
+    'file_old'    => $colour{red},
+    'file_new'    => $colour{blue},
+    'diff_stuff'  => $colour{magenta},
+    'cvs_stuff'   => $colour{green},
     'show_banner' => 1,
     'color_patch' => 0,
 );
