@@ -1,1 +1,4 @@
-See BUGS :-)
+* Allow --difftype=string .
+* Allow colordiff specific flags. 
+  --difftype={plain,context,unified,sideside,debdiff}
+  optionally, throw away other options if in a pipe
