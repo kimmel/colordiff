@@ -45,7 +45,8 @@ sub determine_diff_type {
     my $input_ref     = shift;
     my $diff_type     = 'unknown';
 
-DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
+    DIFF_TYPE: 
+    foreach my $record ( @{$input_ref} ) {
         if ( defined $user_difftype ) {
             $diff_type = $user_difftype;
             last DIFF_TYPE;
@@ -64,10 +65,10 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
             # Plain diffs have NcN, NdN and NaN etc.
             when (m/^\d+[acd]\d+$/xms) { $diff_type = 'diff'; }
 
-         # FIXME - This is not very specific, since the regex matches could
-         # easily match non-diff output.
-         # However, given that we have not yet matched any of the *other* diff
-         # types, this might be good enough
+            # FIXME - This is not very specific, since the regex matches
+            # could easily match non-diff output.  However, given that we
+            # have not yet matched any of the *other* diff types, this might
+            # be good enough
             when (m/(?:\s[|]\s|\s<$|\s>\s)/xms) { $diff_type = 'diffy'; }
 
             # wdiff deleted/added patterns
