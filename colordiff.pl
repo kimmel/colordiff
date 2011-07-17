@@ -88,7 +88,7 @@ sub determine_diff_type {
 sub show_banner {
     my $display = shift;
 
-    exit if ( $display == 0 );
+    return if ( $display == 0 );
 
     my $app_name     = 'colordiff';
     my $version      = '2.0.0';
