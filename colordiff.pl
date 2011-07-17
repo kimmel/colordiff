@@ -29,6 +29,7 @@ use Getopt::Long qw(:config pass_through);
 use IPC::Open2;
 use Term::ANSIColor qw(:constants color);
 use Module::Load::Conditional qw( can_load );
+use Carp qw( carp croak );
 
 #pull in Perl 6 given/when
 use feature qw(:5.10);
@@ -37,6 +38,8 @@ if ( $PERL_VERSION < v5.12 ) {
     can_load( modules => { 'Switch' => '2.09', }, verbose => 1 );
 }
 
+# This may not be perfect - should identify most reasonably
+# formatted diffs and patches
 sub determine_diff_type {
     my $user_difftype = shift;
     my $input_ref     = shift;
@@ -81,14 +84,111 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
     return $diff_type;
 }
 
+sub show_banner {
+    my $display = shift;
+
+    exit if ( $display == 0 );
+
+    my $app_name     = 'colordiff';
+    my $version      = '2.0.0';
+    my $author       = 'Dave Ewart';
+    my $author_email = 'davee@sungate.co.uk';
+    my $app_www      = 'http://colordiff.sourceforge.net/';
+    my $copyright    = '(C)2002-2011';
+
+    print {*STDERR} "$app_name $version ($app_www)\n";
+    print {*STDERR} "$copyright $author, $author_email\n\n";
+
+    return 0;
+}
+
+sub parse_config_file {
+    my $color_ref    = shift;
+    my $settings_ref = shift;
+    my $location     = shift;
+    my %colour       = %{$color_ref};
+    my %settings     = %{$settings_ref};
+
+    return %settings if ( !-e $location || !-r $location );
+
+    open my $fh, '<', $location || croak "Cannot open $location: $OS_ERROR";
+    my @contents = <$fh>;
+    close $fh || croak "Cannot open $location: $OS_ERROR";
+
+    foreach my $line (@contents) {
+        my $colourval;
+        chomp $line;
+        $line =~ s/\s+//gxms;
+        next if ( $line =~ m/^[#]/xms || $line =~ m/^$/xms );
+        $line = lc $line;
+
+        my ( $option, $value ) = split /=/xms, $line;
+        if ( !defined $value ) {
+            print {*STDERR} "$location Invalid configuration pair: '$line'\n";
+            next;
+        }
+
+        if ( $option eq 'banner' ) {
+            if ( $value eq 'no' ) {
+                $settings{show_banner} = 0;
+            }
+            elsif ( $value eq 'yes' ) {
+                $settings{show_banner} = 1;
+            }
+            next;
+        }
+        if ( $option eq 'color_patches' ) {
+            if ( $value eq 'yes' ) {
+                $settings{color_patch} = 1;
+            }
+            next;
+        }
+
+        if ( ( $value eq 'normal' ) || ( $value eq 'none' ) ) {
+            $value = 'off';
+        }
+
+        #256 color support via specifiying the number in colordiffrc
+        if ( $value =~ m/\d+/xms && $value >= 0 && $value <= 255 ) {
+
+            if ( $value < 8 ) {
+                $colourval = "\033[0;3${value}m";
+            }
+            elsif ( $value < 15 ) {
+                $colourval = "\033[0;9${value}m";
+            }
+            else {
+                $colourval = "\033[0;38;5;${value}m";
+            }
+        }
+        elsif ( defined $colour{$value} ) {
+            $colourval = $colour{$value};
+        }
+        else {
+            print {*STDERR}
+                "Invalid colour specification for setting $option ($value) in $location\n";
+            next;
+        }
+
+        given ($option) {
+            when ('plain')     { $settings{plain_text} = $colourval; }
+            when ('oldtext')   { $settings{file_old}   = $colourval; }
+            when ('newtext')   { $settings{file_new}   = $colourval; }
+            when ('diffstuff') { $settings{diff_stuff} = $colourval; }
+            when ('cvsstuff')  { $settings{cvs_stuff}  = $colourval; }
+            default {
+                print {
+                    *STDERR
+                }
+                "Unknown option in $location: $option\n";
+            }
+        }
+    }
+
+    return %settings;
+}
+
 # ----------------------------------------------------------------------------
-my $app_name     = 'colordiff';
-my $version      = '2.0.0';
-my $author       = 'Dave Ewart';
-my $author_email = 'davee@sungate.co.uk';
-my $app_www      = 'http://colordiff.sourceforge.net/';
-my $copyright    = '(C)2002-2011';
-my $color_patch  = 0;
 
 # ANSI sequences for colours
 my %colour = (
@@ -112,124 +212,38 @@ my %colour = (
     'off'         => "\033[0;0m",
 );
 
-# Default colours if /etc/colordiffrc or ~/.colordiffrc do not exist
-my $plain_text = $colour{white};
-my $file_old   = $colour{red};
-my $file_new   = $colour{blue};
-my $diff_stuff = $colour{magenta};
-my $cvs_stuff  = $colour{green};
+# Default settings if /etc/colordiffrc or ~/.colordiffrc do not exist.
+my %settings = (
+    'plain_text'  => $colour{white},
+    'file_old'    => $colour{red},
+    'file_new'    => $colour{blue},
+    'diff_stuff'  => $colour{magenta},
+    'cvs_stuff'   => $colour{green},
+    'show_banner' => 1,
+    'color_patch' => 0,
+);
 
-# Locations for personal and system-wide colour configurations
-my $HOME   = $ENV{HOME};
-my $etcdir = '/etc';
-my @config_files = ("$etcdir/colordiffrc");
-push @config_files, "$ENV{HOME}/.colordiffrc" if ( defined $ENV{HOME} );
-
-my $show_banner = 1;
-
-foreach my $config_file (@config_files) {
-    my ( $setting, $value );
-    if ( open my $COLORDIFFRC, '<', $config_file ) {
-        while (<$COLORDIFFRC>) {
-            my $colourval;
-
-            chop;
-            s/\s+//gxms;
-            next if ( m/^[#]/xms || m/^$/xms );
-            
-            ( $setting, $value ) = split '=';
-            if ( !defined $value ) {
-                print STDERR
-                    "Invalid configuration line ($_) in $config_file\n";
-                next;
-            }
-
-            $setting =~ tr/A-Z/a-z/;
-            $value   =~ tr/A-Z/a-z/;
-
-            if ( $setting eq 'banner' ) {
-                if ( $value eq 'no' ) {
-                    $show_banner = 0;
-                } 
-                elsif ($value eq 'yes' ) {
-                  $show_banner = 1;
-                }
-                next;
-            }
-            if ( $setting eq 'color_patches' ) {
-                if ( $value eq 'yes' ) {
-                    $color_patch = 1;
-                }
-                next;
-            }
-
-
-            if ( ( $value eq 'normal' ) || ( $value eq 'none' ) ) {
-                $value = 'off';
-            }
-
-            #256 color support via specifiying the number in colordiffrc
-            if ( $value =~ m/\d+/xms && $value >= 0 && $value <= 255 ) {
-                
-                if ( $value < 8 ) {
-                    $colourval = "\033[0;3${value}m";
-                }
-                elsif ( $value < 15 ) {
-                    $colourval = "\033[0;9${value}m";
-                }
-                else {
-                    $colourval = "\033[0;38;5;${value}m";
-                }
-            }
-            elsif ( defined $colour{$value} ) {
-                $colourval = $colour{$value};
-            }
-            else {
-                print STDERR
-                    "Invalid colour specification for setting $setting ($value) in $config_file\n";
-                next;
-            }
-
-            given ($setting) {
-                when ('plain') { $plain_text = $colourval; }
-                when ('oldtext') { $file_old = $colourval; }
-                when ('newtext') { $file_new = $colourval; }
-                when ('diffstuff') { $diff_stuff = $colourval; }
-                when ('cvsstuff') { $cvs_stuff = $colourval; }
-                default { print STDERR "Unknown option in $config_file: $setting\n"; }
-            }
-        }
-        close $COLORDIFFRC;
-    } #end if open 
-} #end foreach @config_files
+%settings = parse_config_file( \%colour, \%settings, '/etc/colordiffrc' );
+if ( defined $ENV{HOME} ) {
+    %settings = parse_config_file( \%colour, \%settings,
+        "$ENV{HOME}/.colordiffrc" );
+}
 
 # If output is to a file, switch off colours, unless 'color_patch' is set
 # Relates to http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=378563
-if ( ( -f STDOUT ) && ( $color_patch == 0 ) ) {
-    $plain_text  = q{};
-    $file_old    = q{};
-    $file_new    = q{};
-    $diff_stuff  = q{};
-    $cvs_stuff   = q{};
-    $plain_text  = q{};
-    $colour{off} = q{};
+if ( ( -f STDOUT ) && ( $settings{color_patch} == 0 ) ) {
+    $settings{plain_text} = q{};
+    $settings{file_old}   = q{};
+    $settings{file_new}   = q{};
+    $settings{diff_stuff} = q{};
+    $settings{cvs_stuff}  = q{};
+    $colour{off}          = q{};
 }
 
 my $specified_difftype;
 GetOptions( "difftype=s" => \$specified_difftype );
-# TODO - check that specified type is valid, issue warning if not
 
-if ( $show_banner == 1 ) {
-    print STDERR "$app_name $version ($app_www)\n";
-    print STDERR "$copyright $author, $author_email\n\n";
-}
-
-# FIXME - work out some magic here to make it rip off
-# colordiff-specific long options, such as:
-#
-#   --difftype={plain,context,unified,sideside,debdiff}
-#
-# then, optionally, throw away other options if in a pipe
+show_banner( $settings{show_banner} );
 
 my @inputstream;
 
@@ -246,13 +260,6 @@ if ( ( defined $ARGV[0] ) || ( -t STDIN ) ) {
 else {
     @inputstream = <STDIN>;
 }
-
-
-# Input stream has been read - need to examine it
-# to determine type of diff we have.
-#
-# This may not be perfect - should identify most reasonably
-# formatted diffs and patches
 
 my $diff_type = determine_diff_type( $specified_difftype, \@inputstream );
 
@@ -334,62 +341,62 @@ my $inside_file_old = 1;
 foreach (@inputstream) {
     if ( $diff_type eq 'diff' ) {
         given ($_) {
-            when (m/^</xms)  { print $file_old; }
-            when (m/^>/xms)  { print $file_new; }
-            when (m/^\d/xms) { print $diff_stuff; }
+            when (m/^</xms)  { print $settings{file_old}; }
+            when (m/^>/xms)  { print $settings{file_new}; }
+            when (m/^\d/xms) { print $settings{diff_stuff}; }
             when (
                 m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
                 )
             {
-                print $cvs_stuff;
+                print $settings{cvs_stuff};
             }
-            when (m/^Only[ ]in/xms) { print $diff_stuff; }
-            default                 { print $plain_text; }
+            when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
+            default                 { print $settings{plain_text}; }
         }
     }
     elsif ( $diff_type eq 'diffc' ) {
         given ($_) {
-            when (m/^-[ ]/xms)      { print $file_old; }
-            when (m/^[+][ ]/xms)    { print $file_new; }
-            when (m/^[*]{4,}/xms)   { print $diff_stuff; }
-            when (m/^Only[ ]in/xms) { print $diff_stuff; }
+            when (m/^-[ ]/xms)      { print $settings{file_old}; }
+            when (m/^[+][ ]/xms)    { print $settings{file_new}; }
+            when (m/^[*]{4,}/xms)   { print $settings{diff_stuff}; }
+            when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
             when (m/^[*]{3}[ ]\d+,\d+/xms) {
-                print $diff_stuff;
+                print $settings{diff_stuff};
                 $inside_file_old = 1;
             }
-            when (m/^[*]{3}[ ]/xms) { print $file_old; }
+            when (m/^[*]{3}[ ]/xms) { print $settings{file_old}; }
             when (m/^---[ ]\d+,\d+/xms) {
-                print $diff_stuff;
+                print $settings{diff_stuff};
                 $inside_file_old = 0;
             }
-            when (m/^---[ ]/xms) { print $file_new; }
+            when (m/^---[ ]/xms) { print $settings{file_new}; }
             when (m/^!/xms) {
                 $inside_file_old == 1
-                    ? print $file_old
-                    : print $file_new;
+                    ? print $settings{file_old}
+                    : print $settings{file_new};
             }
             when (
                 m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
                 )
             {
-                print $cvs_stuff;
+                print $settings{cvs_stuff};
             }
-            default { print $plain_text; }
+            default { print $settings{plain_text}; }
         }
     }
     elsif ( $diff_type eq 'diffu' ) {
         given ($_) {
-            when (m/^-/xms)         { print $file_old; }
-            when (m/^[+]/xms)       { print $file_new; }
-            when (m/^[@]/xms)       { print $diff_stuff; }
-            when (m/^Only[ ]in/xms) { print $diff_stuff; }
+            when (m/^-/xms)         { print $settings{file_old}; }
+            when (m/^[+]/xms)       { print $settings{file_new}; }
+            when (m/^[@]/xms)       { print $settings{diff_stuff}; }
+            when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
             when (
                 m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
                 )
             {
-                print $cvs_stuff;
+                print $settings{cvs_stuff};
             }
-            default { print $plain_text; }
+            default { print $settings{plain_text}; }
         }
     }
 
@@ -399,32 +406,32 @@ foreach (@inputstream) {
         if ( length($_) > ( $diffy_sep_col + 2 ) ) {
             my $sepchars = substr $_, $diffy_sep_col, 2;
             if ( $sepchars eq ' <' ) {
-                print $file_old;
+                print $settings{file_old};
             }
             elsif ( $sepchars eq ' |' ) {
-                print $diff_stuff;
+                print $settings{diff_stuff};
             }
             elsif ( $sepchars eq ' >' ) {
-                print $file_new;
+                print $settings{file_new};
             }
             else {
-                print "$plain_text";
+                print $settings{plain_text};
             }
         }
         elsif (m/^Only[ ]in/xms) {
-            print $diff_stuff;
+            print $settings{diff_stuff};
         }
         else {
-            print "$plain_text";
+            print $settings{plain_text};
         }
     }
     elsif ( $diff_type eq 'wdiff' ) {
-        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/gms;
-        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/gms;
+        $_ =~ s/(\[-[^]]*?-\])/$settings{file_old}$1$colour{off}/gms;
+        $_ =~ s/(\{\+[^]]*?\+\})/$settings{file_new}$1$colour{off}/gms;
     }
     elsif ( $diff_type eq 'debdiff' ) {
-        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/gms;
-        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/gms;
+        $_ =~ s/(\[-[^]]*?-\])/$settings{file_old}$1$colour{off}/gms;
+        $_ =~ s/(\{\+[^]]*?\+\})/$settings{file_new}$1$colour{off}/gms;
     }
 
     print $_, color 'reset';
