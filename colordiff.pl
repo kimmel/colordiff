@@ -45,7 +45,7 @@ sub determine_diff_type {
     my $input_ref     = shift;
     my $diff_type     = 'unknown';
 
-    DIFF_TYPE: 
+    DIFF_TYPE:
     foreach my $record ( @{$input_ref} ) {
         if ( defined $user_difftype ) {
             $diff_type = $user_difftype;
