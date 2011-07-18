@@ -142,7 +142,7 @@ sub parse_config_file {
                 $settings{color_patches} = 1;
             }
             elsif ( $value eq 'no' ) {
-              $settings{color_patches} = 0;
+                $settings{color_patches} = 0;
             }
             next;
         }
@@ -192,7 +192,6 @@ sub parse_config_file {
 }
 
 sub preprocess_input {
-    my $diff_type = shift;
     my $input_ref = shift;
 
   # Special pre-processing for side-by-side diffs
@@ -207,60 +206,57 @@ sub preprocess_input {
     my $mostlikely_sum = 0;
     my $longest_record = 0;
 
-    if ( $diff_type eq 'diffy' ) {
+    # Not very elegant, but does the job
+    # Unfortunately requires parsing the input stream multiple times
+    foreach my $line ( @{$input_ref} ) {
 
-        # Not very elegant, but does the job
-        # Unfortunately requires parsing the input stream multiple times
-        foreach my $line ( @{$input_ref} ) {
+        # Convert tabs to spaces
+        while ( ( my $i = index $line, "\t" ) > -1 ) {
+            substr $line, $i, 1,    # range to replace
+                ( q{ } x ( 8 - ( $i % 8 ) ) );    # string to replace with
+        }
+        if ( length($line) > $longest_record ) {
+            $longest_record = length $line;
+        }
+    }
 
-            # Convert tabs to spaces
-            while ( ( my $i = index $line, "\t" ) > -1 ) {
-                substr $line, $i, 1,    # range to replace
-                    ( q{ } x ( 8 - ( $i % 8 ) ) );    # string to replace with
+    for my $i ( 0 .. $longest_record ) {
+        $separator_col{$i} = 1;
+        $candidate_col{$i} = 0;
+    }
+
+    foreach ( @{$input_ref} ) {
+
+        # Convert tabs to spaces
+        while ( ( my $i = index $_, "\t" ) > -1 ) {
+            substr $_, $i, 1,    # range to replace
+                ( q{ } x ( 8 - ( $i % 8 ) ) );    # string to replace with
+        }
+        for my $i ( 0 .. ( length($_) - 3 ) ) {
+            next if ( !defined $separator_col{$i} );
+            next if ( $separator_col{$i} == 0 );
+            my $subsub = substr $_, $i, 2;
+            if (   ( $subsub ne q{  } )
+                && ( $subsub ne ' |' )
+                && ( $subsub ne ' >' )
+                && ( $subsub ne ' <' ) )
+            {
+                $separator_col{$i} = 0;
             }
-            if ( length($line) > $longest_record ) {
-                $longest_record = length $line;
+            if (   ( $subsub eq ' |' )
+                || ( $subsub eq ' >' )
+                || ( $subsub eq ' <' ) )
+            {
+                $candidate_col{$i}++;
             }
         }
+    }
 
-        for my $i ( 0 .. $longest_record ) {
-            $separator_col{$i} = 1;
-            $candidate_col{$i} = 0;
-        }
-
-        foreach ( @{$input_ref} ) {
-
-            # Convert tabs to spaces
-            while ( ( my $i = index $_, "\t" ) > -1 ) {
-                substr $_, $i, 1,    # range to replace
-                    ( q{ } x ( 8 - ( $i % 8 ) ) );    # string to replace with
-            }
-            for my $i ( 0 .. ( length($_) - 3 ) ) {
-                next if ( !defined $separator_col{$i} );
-                next if ( $separator_col{$i} == 0 );
-                my $subsub = substr $_, $i, 2;
-                if (   ( $subsub ne q{  } )
-                    && ( $subsub ne ' |' )
-                    && ( $subsub ne ' >' )
-                    && ( $subsub ne ' <' ) )
-                {
-                    $separator_col{$i} = 0;
-                }
-                if (   ( $subsub eq ' |' )
-                    || ( $subsub eq ' >' )
-                    || ( $subsub eq ' <' ) )
-                {
-                    $candidate_col{$i}++;
-                }
-            }
-        }
-
-        for my $i ( 0 .. ( $longest_record - 3 ) ) {
-            if ( $separator_col{$i} == 1 ) {
-                if ( $candidate_col{$i} > $mostlikely_sum ) {
-                    $diffy_sep_col  = $i;
-                    $mostlikely_sum = $i;
-                }
+    for my $i ( 0 .. ( $longest_record - 3 ) ) {
+        if ( $separator_col{$i} == 1 ) {
+            if ( $candidate_col{$i} > $mostlikely_sum ) {
+                $diffy_sep_col  = $i;
+                $mostlikely_sum = $i;
             }
         }
     }
@@ -294,12 +290,12 @@ my %colour = (
 
 # Default settings if /etc/colordiffrc or ~/.colordiffrc do not exist.
 my %settings = (
-    'plain_text'  => $colour{white},
-    'file_old'    => $colour{red},
-    'file_new'    => $colour{blue},
-    'diff_stuff'  => $colour{magenta},
-    'cvs_stuff'   => $colour{green},
-    'banner' => 1,
+    'plain_text'    => $colour{white},
+    'file_old'      => $colour{red},
+    'file_new'      => $colour{blue},
+    'diff_stuff'    => $colour{magenta},
+    'cvs_stuff'     => $colour{green},
+    'banner'        => 1,
     'color_patches' => 0,
 );
 
@@ -342,8 +338,11 @@ else {
 }
 
 my $diff_type = determine_diff_type( $specified_difftype, \@inputstream );
+my $diffy_sep_col = 0;
 
-my $diffy_sep_col = preprocess_input( $diff_type, \@inputstream );
+if ( $diff_type eq 'diffy' ) {
+    $diffy_sep_col = preprocess_input( \@inputstream );
+}
 
 # ------------------------------------------------------------------------------
 
