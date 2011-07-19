@@ -131,16 +131,19 @@ sub parse_config_file {
 
         if ( $option eq 'banner' ) {
             if ( $value eq 'no' ) {
-                $settings{show_banner} = 0;
+                $settings{banner} = 0;
             }
             elsif ( $value eq 'yes' ) {
-                $settings{show_banner} = 1;
+                $settings{banner} = 1;
             }
             next;
         }
         if ( $option eq 'color_patches' ) {
             if ( $value eq 'yes' ) {
-                $settings{color_patch} = 1;
+                $settings{color_patches} = 1;
+            }
+            elsif ( $value eq 'no' ) {
+                $settings{color_patches} = 0;
             }
             next;
         }
@@ -189,99 +192,24 @@ sub parse_config_file {
     return %settings;
 }
 
-# ----------------------------------------------------------------------------
+sub preprocess_input {
+    my $input_ref = shift;
 
-# ANSI sequences for colours
-my %colour = (
-    'white'   => "\033[1;37m",
-    'yellow'  => "\033[1;33m",
-    'green'   => "\033[1;32m",
-    'blue'    => "\033[1;34m",
-    'cyan'    => "\033[1;36m",
-    'red'     => "\033[1;31m",
-    'magenta' => "\033[1;35m",
-    'black'   => "\033[1;30m",
+  # Special pre-processing for side-by-side diffs
+  # Figure out location of central markers: these will be a consecutive set of
+  # three columns where the first and third always consist of spaces and the
+  # second consists only of spaces, '<', '>' and '|'
+  # This is not a 100% certain match, but should be good enough
 
-    'darkwhite'   => "\033[0;37m",
-    'darkyellow'  => "\033[0;33m",
-    'darkgreen'   => "\033[0;32m",
-    'darkblue'    => "\033[0;34m",
-    'darkcyan'    => "\033[0;36m",
-    'darkred'     => "\033[0;31m",
-    'darkmagenta' => "\033[0;35m",
-    'darkblack'   => "\033[0;30m",
-    'off'         => "\033[0;0m",
-);
-
-# Default settings if /etc/colordiffrc or ~/.colordiffrc do not exist.
-my %settings = (
-    'plain_text'  => $colour{white},
-    'file_old'    => $colour{red},
-    'file_new'    => $colour{blue},
-    'diff_stuff'  => $colour{magenta},
-    'cvs_stuff'   => $colour{green},
-    'show_banner' => 1,
-    'color_patch' => 0,
-);
-
-%settings = parse_config_file( \%colour, \%settings, '/etc/colordiffrc' );
-if ( defined $ENV{HOME} ) {
-    %settings = parse_config_file( \%colour, \%settings,
-        "$ENV{HOME}/.colordiffrc" );
-}
-
-# If output is to a file, switch off colours, unless 'color_patch' is set
-# Relates to http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=378563
-if ( ( -f STDOUT ) && ( $settings{color_patch} == 0 ) ) {
-    $settings{plain_text} = q{};
-    $settings{file_old}   = q{};
-    $settings{file_new}   = q{};
-    $settings{diff_stuff} = q{};
-    $settings{cvs_stuff}  = q{};
-    $colour{off}          = q{};
-}
-
-my $specified_difftype;
-GetOptions( "difftype=s" => \$specified_difftype );
-
-show_banner( $settings{show_banner} );
-
-my @inputstream;
-
-my $exitcode = 0;
-if ( ( defined $ARGV[0] ) || ( -t STDIN ) ) {
-
-    # More reliable way of pulling in arguments
-    my $pid = open2( \*INPUTSTREAM, undef, 'diff', @ARGV );
-    @inputstream = <INPUTSTREAM>;
-    close INPUTSTREAM;
-    waitpid $pid, 0;
-    $exitcode = $CHILD_ERROR >> 8;
-}
-else {
-    @inputstream = <STDIN>;
-}
-
-my $diff_type = determine_diff_type( $specified_difftype, \@inputstream );
-
-# ------------------------------------------------------------------------------
-# Special pre-processing for side-by-side diffs
-# Figure out location of central markers: these will be a consecutive set of
-# three columns where the first and third always consist of spaces and the
-# second consists only of spaces, '<', '>' and '|'
-# This is not a 100% certain match, but should be good enough
-
-my %separator_col  = ();
-my %candidate_col  = ();
-my $diffy_sep_col  = 0;
-my $mostlikely_sum = 0;
-my $longest_record = 0;
-
-if ( $diff_type eq 'diffy' ) {
+    my %separator_col  = ();
+    my %candidate_col  = ();
+    my $diffy_sep_col  = 0;
+    my $mostlikely_sum = 0;
+    my $longest_record = 0;
 
     # Not very elegant, but does the job
     # Unfortunately requires parsing the input stream multiple times
-    foreach my $line (@inputstream) {
+    foreach my $line ( @{$input_ref} ) {
 
         # Convert tabs to spaces
         while ( ( my $i = index $line, "\t" ) > -1 ) {
@@ -298,7 +226,7 @@ if ( $diff_type eq 'diffy' ) {
         $candidate_col{$i} = 0;
     }
 
-    foreach (@inputstream) {
+    foreach ( @{$input_ref} ) {
 
         # Convert tabs to spaces
         while ( ( my $i = index $_, "\t" ) > -1 ) {
@@ -333,6 +261,88 @@ if ( $diff_type eq 'diffy' ) {
             }
         }
     }
+
+    return $diffy_sep_col;
+}
+
+# ----------------------------------------------------------------------------
+
+# ANSI sequences for colours
+my %colour = (
+    'white'   => "\033[1;37m",
+    'yellow'  => "\033[1;33m",
+    'green'   => "\033[1;32m",
+    'blue'    => "\033[1;34m",
+    'cyan'    => "\033[1;36m",
+    'red'     => "\033[1;31m",
+    'magenta' => "\033[1;35m",
+    'black'   => "\033[1;30m",
+
+    'darkwhite'   => "\033[0;37m",
+    'darkyellow'  => "\033[0;33m",
+    'darkgreen'   => "\033[0;32m",
+    'darkblue'    => "\033[0;34m",
+    'darkcyan'    => "\033[0;36m",
+    'darkred'     => "\033[0;31m",
+    'darkmagenta' => "\033[0;35m",
+    'darkblack'   => "\033[0;30m",
+    'off'         => "\033[0;0m",
+);
+
+# Default settings if /etc/colordiffrc or ~/.colordiffrc do not exist.
+my %settings = (
+    'plain_text'    => $colour{white},
+    'file_old'      => $colour{red},
+    'file_new'      => $colour{blue},
+    'diff_stuff'    => $colour{magenta},
+    'cvs_stuff'     => $colour{green},
+    'banner'        => 1,
+    'color_patches' => 0,
+);
+
+%settings = parse_config_file( \%colour, \%settings, '/etc/colordiffrc' );
+if ( defined $ENV{HOME} ) {
+    %settings = parse_config_file( \%colour, \%settings,
+        "$ENV{HOME}/.colordiffrc" );
+}
+
+# If output is to a file, switch off colours, unless 'color_patches' is set
+# Relates to http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=378563
+if ( ( -f STDOUT ) && ( $settings{color_patches} == 0 ) ) {
+    $settings{plain_text} = q{};
+    $settings{file_old}   = q{};
+    $settings{file_new}   = q{};
+    $settings{diff_stuff} = q{};
+    $settings{cvs_stuff}  = q{};
+    $colour{off}          = q{};
+}
+
+my $specified_difftype;
+GetOptions( "difftype=s" => \$specified_difftype );
+
+show_banner( $settings{banner} );
+
+my @inputstream;
+
+my $exitcode = 0;
+if ( ( defined $ARGV[0] ) || ( -t STDIN ) ) {
+
+    # More reliable way of pulling in arguments
+    my $pid = open2( \*INPUTSTREAM, undef, 'diff', @ARGV );
+    @inputstream = <INPUTSTREAM>;
+    close INPUTSTREAM;
+    waitpid $pid, 0;
+    $exitcode = $CHILD_ERROR >> 8;
+}
+else {
+    @inputstream = <STDIN>;
+}
+
+my $diff_type = determine_diff_type( $specified_difftype, \@inputstream );
+my $diffy_sep_col = 0;
+
+if ( $diff_type eq 'diffy' ) {
+    $diffy_sep_col = preprocess_input( \@inputstream );
 }
 
 # ------------------------------------------------------------------------------
