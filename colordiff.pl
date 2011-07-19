@@ -25,7 +25,7 @@ use 5.008_000;
 use warnings;
 use strict;
 use English qw( -no_match_vars );
-use Getopt::Long qw(:config pass_through);
+use Getopt::Long qw( GetOptions :config pass_through );
 use IPC::Open2;
 use Term::ANSIColor qw(:constants color);
 use Module::Load::Conditional qw( can_load );
@@ -103,11 +103,9 @@ sub show_banner {
 }
 
 sub parse_config_file {
-    my $color_ref    = shift;
-    my $settings_ref = shift;
-    my $location     = shift;
-    my %colour       = %{$color_ref};
-    my %settings     = %{$settings_ref};
+    my %colour   = %{ (shift) };
+    my %settings = %{ (shift) };
+    my $location = shift;
 
     return %settings if ( !-e $location || !-r $location );
 
@@ -264,6 +262,116 @@ sub preprocess_input {
     return $diffy_sep_col;
 }
 
+sub parse_and_print {
+    my %settings = %{ (shift) };
+    my @input    = @{ (shift) };
+    my $type     = shift;
+    my $diffy_sep_col   = shift;
+    my $inside_file_old = 1;
+
+    foreach (@input) {
+        if ( $type eq 'diff' ) {
+            given ($_) {
+                when (m/^</xms)  { print $settings{file_old}; }
+                when (m/^>/xms)  { print $settings{file_new}; }
+                when (m/^\d/xms) { print $settings{diff_stuff}; }
+                when (
+                    m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
+                    )
+                {
+                    print $settings{cvs_stuff};
+                }
+                when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
+                default                 { print $settings{plain_text}; }
+            }
+        }
+        elsif ( $type eq 'diffc' ) {
+            given ($_) {
+                when (m/^-[ ]/xms)      { print $settings{file_old}; }
+                when (m/^[+][ ]/xms)    { print $settings{file_new}; }
+                when (m/^[*]{4,}/xms)   { print $settings{diff_stuff}; }
+                when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
+                when (m/^[*]{3}[ ]\d+,\d+/xms) {
+                    print $settings{diff_stuff};
+                    $inside_file_old = 1;
+                }
+                when (m/^[*]{3}[ ]/xms) { print $settings{file_old}; }
+                when (m/^---[ ]\d+,\d+/xms) {
+                    print $settings{diff_stuff};
+                    $inside_file_old = 0;
+                }
+                when (m/^---[ ]/xms) { print $settings{file_new}; }
+                when (m/^!/xms) {
+                    $inside_file_old == 1
+                        ? print $settings{file_old}
+                        : print $settings{file_new};
+                }
+                when (
+                    m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
+                    )
+                {
+                    print $settings{cvs_stuff};
+                }
+                default { print $settings{plain_text}; }
+            }
+        }
+        elsif ( $type eq 'diffu' ) {
+            given ($_) {
+                when (m/^-/xms)         { print $settings{file_old}; }
+                when (m/^[+]/xms)       { print $settings{file_new}; }
+                when (m/^[@]/xms)       { print $settings{diff_stuff}; }
+                when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
+                when (
+                    m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
+                    )
+                {
+                    print $settings{cvs_stuff};
+                }
+                default { print $settings{plain_text}; }
+            }
+        }
+
+        # Works with previously-identified column containing the diff-y
+        # separator characters
+        elsif ( $type eq 'diffy' ) {
+            if ( length($_) > ( $diffy_sep_col + 2 ) ) {
+                my $sepchars = substr $_, $diffy_sep_col, 2;
+                if ( $sepchars eq ' <' ) {
+                    print $settings{file_old};
+                }
+                elsif ( $sepchars eq ' |' ) {
+                    print $settings{diff_stuff};
+                }
+                elsif ( $sepchars eq ' >' ) {
+                    print $settings{file_new};
+                }
+                else {
+                    print $settings{plain_text};
+                }
+            }
+            elsif (m/^Only[ ]in/xms) {
+                print $settings{diff_stuff};
+            }
+            else {
+                print $settings{plain_text};
+            }
+        }
+        elsif ( $type eq 'wdiff' ) {
+            $_ =~ s/(\[-[^]]*?-\])/$settings{file_old}$1$settings{off}/gms;
+            $_
+                =~ s/([{][+][^]]*?[+][}])/$settings{file_new}$1$settings{off}/gms;
+        }
+        elsif ( $type eq 'debdiff' ) {
+            $_ =~ s/(\[-[^]]*?-\])/$settings{file_old}$1$settings{off}/gms;
+            $_
+                =~ s/([{][+][^]]*?[+][}])/$settings{file_new}$1$settings{off}/gms;
+        }
+
+        print $_, color 'reset';
+    }
+    return;
+}
+
 # ----------------------------------------------------------------------------
 
 # ANSI sequences for colours
@@ -297,7 +405,12 @@ my %settings = (
     'cvs_stuff'     => $colour{green},
     'banner'        => 1,
     'color_patches' => 0,
+    'off'           => $colour{off},
 );
+
+my $specified_difftype;
+
+my $cli_options = GetOptions( 'difftype=s' => \$specified_difftype, );
 
 %settings = parse_config_file( \%colour, \%settings, '/etc/colordiffrc' );
 if ( defined $ENV{HOME} ) {
@@ -315,9 +428,6 @@ if ( ( -f STDOUT ) && ( $settings{color_patches} == 0 ) ) {
     $settings{cvs_stuff}  = q{};
     $colour{off}          = q{};
 }
-
-my $specified_difftype;
-GetOptions( "difftype=s" => \$specified_difftype );
 
 show_banner( $settings{banner} );
 
@@ -344,107 +454,6 @@ if ( $diff_type eq 'diffy' ) {
     $diffy_sep_col = preprocess_input( \@inputstream );
 }
 
-# ------------------------------------------------------------------------------
-
-my $inside_file_old = 1;
-
-foreach (@inputstream) {
-    if ( $diff_type eq 'diff' ) {
-        given ($_) {
-            when (m/^</xms)  { print $settings{file_old}; }
-            when (m/^>/xms)  { print $settings{file_new}; }
-            when (m/^\d/xms) { print $settings{diff_stuff}; }
-            when (
-                m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
-                )
-            {
-                print $settings{cvs_stuff};
-            }
-            when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
-            default                 { print $settings{plain_text}; }
-        }
-    }
-    elsif ( $diff_type eq 'diffc' ) {
-        given ($_) {
-            when (m/^-[ ]/xms)      { print $settings{file_old}; }
-            when (m/^[+][ ]/xms)    { print $settings{file_new}; }
-            when (m/^[*]{4,}/xms)   { print $settings{diff_stuff}; }
-            when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
-            when (m/^[*]{3}[ ]\d+,\d+/xms) {
-                print $settings{diff_stuff};
-                $inside_file_old = 1;
-            }
-            when (m/^[*]{3}[ ]/xms) { print $settings{file_old}; }
-            when (m/^---[ ]\d+,\d+/xms) {
-                print $settings{diff_stuff};
-                $inside_file_old = 0;
-            }
-            when (m/^---[ ]/xms) { print $settings{file_new}; }
-            when (m/^!/xms) {
-                $inside_file_old == 1
-                    ? print $settings{file_old}
-                    : print $settings{file_new};
-            }
-            when (
-                m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
-                )
-            {
-                print $settings{cvs_stuff};
-            }
-            default { print $settings{plain_text}; }
-        }
-    }
-    elsif ( $diff_type eq 'diffu' ) {
-        given ($_) {
-            when (m/^-/xms)         { print $settings{file_old}; }
-            when (m/^[+]/xms)       { print $settings{file_new}; }
-            when (m/^[@]/xms)       { print $settings{diff_stuff}; }
-            when (m/^Only[ ]in/xms) { print $settings{diff_stuff}; }
-            when (
-                m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
-                )
-            {
-                print $settings{cvs_stuff};
-            }
-            default { print $settings{plain_text}; }
-        }
-    }
-
-    # Works with previously-identified column containing the diff-y
-    # separator characters
-    elsif ( $diff_type eq 'diffy' ) {
-        if ( length($_) > ( $diffy_sep_col + 2 ) ) {
-            my $sepchars = substr $_, $diffy_sep_col, 2;
-            if ( $sepchars eq ' <' ) {
-                print $settings{file_old};
-            }
-            elsif ( $sepchars eq ' |' ) {
-                print $settings{diff_stuff};
-            }
-            elsif ( $sepchars eq ' >' ) {
-                print $settings{file_new};
-            }
-            else {
-                print $settings{plain_text};
-            }
-        }
-        elsif (m/^Only[ ]in/xms) {
-            print $settings{diff_stuff};
-        }
-        else {
-            print $settings{plain_text};
-        }
-    }
-    elsif ( $diff_type eq 'wdiff' ) {
-        $_ =~ s/(\[-[^]]*?-\])/$settings{file_old}$1$colour{off}/gms;
-        $_ =~ s/(\{\+[^]]*?\+\})/$settings{file_new}$1$colour{off}/gms;
-    }
-    elsif ( $diff_type eq 'debdiff' ) {
-        $_ =~ s/(\[-[^]]*?-\])/$settings{file_old}$1$colour{off}/gms;
-        $_ =~ s/(\{\+[^]]*?\+\})/$settings{file_new}$1$colour{off}/gms;
-    }
-
-    print $_, color 'reset';
-}
+parse_and_print( \%settings, \@inputstream, $diff_type, $diffy_sep_col );
 
 exit $exitcode;
