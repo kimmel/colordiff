@@ -44,10 +44,10 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
             # Plain diffs have NcN, NdN and NaN etc.
             when (m/^\d+[acd]\d+$/xms) { $diff_type = 'diff'; }
 
-         # FIXME - This is not very specific, since the regex matches could
-         # easily match non-diff output.
-         # However, given that we have not yet matched any of the *other* diff
-         # types, this might be good enough
+            # FIXME - This is not very specific, since the regex matches
+            # could easily match non-diff output.  However, given that we
+            # have not yet matched any of the *other* diff types, this might
+            # be good enough
             when (m/(?:\s[|]\s|\s<$|\s>\s)/xms) { $diff_type = 'diffy'; }
 
             # wdiff deleted/added patterns
@@ -523,8 +523,8 @@ C<colordiff> - a wrapper/replacment for 'diff' producing colourful output
 
 =head1 LICENSE AND COPYRIGHT
 
-  Copyright (c) 2002-2011 Dave Ewart. All rights reserved.
-  Copyright (c) 2011 Kirk Kimmel. All rights reserved.
+  Copyright (C) 2002-2011 Dave Ewart
+  Copyright (C) 2011 Kirk Kimmel
 
   This program is free software; you can redistribute it and/or modify it under the GPL v2+. The full text of this license can be found online at < http://opensource.org/licenses/GPL-2.0 >
 
