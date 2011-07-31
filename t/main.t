@@ -6,6 +6,7 @@ use diagnostics;
 use Test::Most qw( tests 8 );
 use Test::Output;
 use IO::All qw(slurp);
+use lib 'lib';
 
 BEGIN {
     use_ok('colordiff');

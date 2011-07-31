@@ -337,7 +337,7 @@ sub parse_and_print {
                 =~ s/([{][+][^]]*?[+][}])/$settings{newtext}$1$settings{off}/gms;
         }
 
-        print $_, color 'reset';
+        print $_, color('reset');
     }
     return;
 }

@@ -10,6 +10,7 @@ BEGIN {
         Carp
         English
         Getopt::Long
+        IO::All
         IPC::Open2
         Module::Load::Conditional
         Pod::Usage
@@ -20,7 +21,6 @@ BEGIN {
         Test::Pod
         Test::Pod::Coverage
         Test::Spelling
-        IO::All
     );
 
     foreach my $class (@classes) {
