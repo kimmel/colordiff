@@ -4,7 +4,8 @@
 
 use warnings;
 use strict;
-use diagnostics;
+
+#use diagnostics;
 
 use English qw( -no_match_vars );
 use Getopt::Long qw( GetOptions :config pass_through );
@@ -288,6 +289,60 @@ sub _parse_diffc {
     return $to_print, $inside_oldtext;
 }
 
+sub _parse_diffu {
+    my $settings = shift;
+    my $line     = shift;
+    my $to_print = q{};
+
+    given ($line) {
+        when (m/^-/xms)   { $to_print = $settings->{oldtext}; }
+        when (m/^[+]/xms) { $to_print = $settings->{newtext}; }
+        when (m/^[@]/xms) { $to_print = $settings->{diffstuff}; }
+        when (m/^Only[ ]in/xms) {
+            $to_print = $settings->{diffstuff};
+        }
+        when (m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms)
+        {
+            $to_print = $settings->{cvsstuff};
+        }
+        default { $to_print = $settings->{plain}; }
+    }
+    return $to_print;
+}
+
+sub _parse_diffy {
+    my $settings      = shift;
+    my $line          = shift;
+    my $diffy_sep_col = shift;
+    my $to_print      = q{};
+
+    # Works with previously-identified column containing the diff-y
+    # separator characters
+    if ( length($line) > ( $diffy_sep_col + 2 ) ) {
+        my $sepchars = substr $line, $diffy_sep_col, 2;
+        if ( $sepchars eq ' <' ) {
+            $to_print = $settings->{oldtext};
+        }
+        elsif ( $sepchars eq ' |' ) {
+            $to_print = $settings->{diffstuff};
+        }
+        elsif ( $sepchars eq ' >' ) {
+            $to_print = $settings->{newtext};
+        }
+        else {
+            $to_print = $settings->{plain};
+        }
+    }
+    elsif (m/^Only[ ]in/xms) {
+        $to_print = $settings->{diffstuff};
+    }
+    else {
+        $to_print = $settings->{plain};
+    }
+
+    return $to_print;
+}
+
 sub parse_and_print {
     my $settings       = shift;
     my @input          = @{ (shift) };
@@ -297,66 +352,29 @@ sub parse_and_print {
 
     my $to_print = q{};
 
-    foreach (@input) {
-        if ( $type eq 'diff' ) {
-            $to_print = _parse_diff( $settings, $_ );
-        }
-        elsif ( $type eq 'diffc' ) {
-            ( $to_print, $inside_oldtext )
-                = _parse_diffc( $settings, $_, $inside_oldtext );
-        }
-        elsif ( $type eq 'diffu' ) {
-            given ($_) {
-                when (m/^-/xms)   { $to_print = $settings->{oldtext}; }
-                when (m/^[+]/xms) { $to_print = $settings->{newtext}; }
-                when (m/^[@]/xms) { $to_print = $settings->{diffstuff}; }
-                when (m/^Only[ ]in/xms) {
-                    $to_print = $settings->{diffstuff};
-                }
-                when (
-                    m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
-                    )
-                {
-                    $to_print = $settings->{cvsstuff};
-                }
-                default { $to_print = $settings->{plain}; }
+    foreach my $chunk (@input) {
+        given ($type) {
+            when ('diff') { $to_print = _parse_diff( $settings, $chunk ); }
+            when ('diffc') {
+                ( $to_print, $inside_oldtext )
+                    = _parse_diffc( $settings, $chunk, $inside_oldtext );
             }
-        }
-
-        # Works with previously-identified column containing the diff-y
-        # separator characters
-        elsif ( $type eq 'diffy' ) {
-            if ( length($_) > ( $diffy_sep_col + 2 ) ) {
-                my $sepchars = substr $_, $diffy_sep_col, 2;
-                if ( $sepchars eq ' <' ) {
-                    $to_print = $settings->{oldtext};
-                }
-                elsif ( $sepchars eq ' |' ) {
-                    $to_print = $settings->{diffstuff};
-                }
-                elsif ( $sepchars eq ' >' ) {
-                    $to_print = $settings->{newtext};
-                }
-                else {
-                    $to_print = $settings->{plain};
-                }
+            when ('diffu') { $to_print = _parse_diffu( $settings, $chunk ); }
+            when ('diffy') {
+                $to_print = _parse_diffy( $settings, $chunk, $diffy_sep_col );
             }
-            elsif (m/^Only[ ]in/xms) {
-                $to_print = $settings->{diffstuff};
+            when ('wdiff') {
+                $chunk
+                    =~ s/(\[-[^]]*?-\])/$settings->{oldtext}$1$settings->{off}/gms;
+                $chunk
+                    =~ s/([{][+][^]]*?[+][}])/$settings->{newtext}$1$settings->{off}/gms;
             }
-            else {
-                $to_print = $settings->{plain};
+            when ('debdiff') {
+                $chunk
+                    =~ s/(\[-[^]]*?-\])/$settings->{oldtext}$1$settings->{off}/gms;
+                $chunk
+                    =~ s/([{][+][^]]*?[+][}])/$settings->{newtext}$1$settings->{off}/gms;
             }
-        }
-        elsif ( $type eq 'wdiff' ) {
-            $_ =~ s/(\[-[^]]*?-\])/$settings->{oldtext}$1$settings->{off}/gms;
-            $_
-                =~ s/([{][+][^]]*?[+][}])/$settings->{newtext}$1$settings->{off}/gms;
-        }
-        elsif ( $type eq 'debdiff' ) {
-            $_ =~ s/(\[-[^]]*?-\])/$settings->{oldtext}$1$settings->{off}/gms;
-            $_
-                =~ s/([{][+][^]]*?[+][}])/$settings->{newtext}$1$settings->{off}/gms;
         }
 
         if ( $to_print =~ m/\d/xms ) {
@@ -365,7 +383,7 @@ sub parse_and_print {
         else {
             print color($to_print);
         }
-        print $_, color('reset');
+        print $chunk, color('reset');
     }
     return;
 }
