@@ -112,7 +112,7 @@ sub parse_config_file {
     );
     my $state = AppConfig::State->new(
         {   GLOBAL => { ARGCOUNT => 1, },
-            ERROR  => sub        { },
+            ERROR  => sub        { },       #suppresses error messages
         }
     );
 
@@ -228,6 +228,66 @@ sub preprocess_input {
     return $diffy_sep_col;
 }
 
+sub _parse_diff {
+    my $settings = shift;
+    my $line     = shift;
+    my $to_print = q{};
+
+    given ($line) {
+        when (m/^</xms)  { $to_print = $settings->{oldtext}; }
+        when (m/^>/xms)  { $to_print = $settings->{newtext}; }
+        when (m/^\d/xms) { $to_print = $settings->{diffstuff}; }
+        when (m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms)
+        {
+            $to_print = $settings->{cvsstuff};
+        }
+        when (m/^Only[ ]in/xms) {
+            $to_print = $settings->{diffstuff};
+        }
+        default { $to_print = $settings->{plain}; }
+    }
+    return $to_print;
+}
+
+sub _parse_diffc {
+    my $settings       = shift;
+    my $line           = shift;
+    my $inside_oldtext = shift;
+    my $to_print       = q{};
+
+    given ($line) {
+        when (m/^-[ ]/xms)    { $to_print = $settings->{oldtext}; }
+        when (m/^[+][ ]/xms)  { $to_print = $settings->{newtext}; }
+        when (m/^[*]{4,}/xms) { $to_print = $settings->{diffstuff}; }
+        when (m/^Only[ ]in/xms) {
+            $to_print = $settings->{diffstuff};
+        }
+        when (m/^[*]{3}[ ]\d+,\d+/xms) {
+            $to_print       = $settings->{diffstuff};
+            $inside_oldtext = 1;
+        }
+        when (m/^[*]{3}[ ]/xms) { $to_print = $settings->{oldtext}; }
+        when (m/^---[ ]\d+,\d+/xms) {
+            $to_print       = $settings->{diffstuff};
+            $inside_oldtext = 0;
+        }
+        when (m/^---[ ]/xms) { $to_print = $settings->{newtext}; }
+        when (m/^!/xms) {
+            $inside_oldtext == 1
+                ? $to_print
+                = $settings->{oldtext}
+                : $to_print = $settings->{newtext};
+        }
+        when (m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms)
+        {
+            $to_print = $settings->{cvsstuff};
+        }
+        default { $to_print = $settings->{plain}; }
+    }
+
+    return $to_print, $inside_oldtext;
+}
+
 sub parse_and_print {
     my $settings       = shift;
     my @input          = @{ (shift) };
@@ -239,54 +299,11 @@ sub parse_and_print {
 
     foreach (@input) {
         if ( $type eq 'diff' ) {
-            given ($_) {
-                when (m/^</xms)  { $to_print = $settings->{oldtext}; }
-                when (m/^>/xms)  { $to_print = $settings->{newtext}; }
-                when (m/^\d/xms) { $to_print = $settings->{diffstuff}; }
-                when (
-                    m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
-                    )
-                {
-                    $to_print = $settings->{cvsstuff};
-                }
-                when (m/^Only[ ]in/xms) {
-                    $to_print = $settings->{diffstuff};
-                }
-                default { $to_print = $settings->{plain}; }
-            }
+            $to_print = _parse_diff( $settings, $_ );
         }
         elsif ( $type eq 'diffc' ) {
-            given ($_) {
-                when (m/^-[ ]/xms)    { $to_print = $settings->{oldtext}; }
-                when (m/^[+][ ]/xms)  { $to_print = $settings->{newtext}; }
-                when (m/^[*]{4,}/xms) { $to_print = $settings->{diffstuff}; }
-                when (m/^Only[ ]in/xms) {
-                    $to_print = $settings->{diffstuff};
-                }
-                when (m/^[*]{3}[ ]\d+,\d+/xms) {
-                    $to_print       = $settings->{diffstuff};
-                    $inside_oldtext = 1;
-                }
-                when (m/^[*]{3}[ ]/xms) { $to_print = $settings->{oldtext}; }
-                when (m/^---[ ]\d+,\d+/xms) {
-                    $to_print       = $settings->{diffstuff};
-                    $inside_oldtext = 0;
-                }
-                when (m/^---[ ]/xms) { $to_print = $settings->{newtext}; }
-                when (m/^!/xms) {
-                    $inside_oldtext == 1
-                        ? $to_print
-                        = $settings->{oldtext}
-                        : $to_print = $settings->{newtext};
-                }
-                when (
-                    m/^(?:Index:[ ]|={4,}|RCS[ ]file:[ ]|retrieving[ ]|diff[ ])/xms
-                    )
-                {
-                    $to_print = $settings->{cvsstuff};
-                }
-                default { $to_print = $settings->{plain}; }
-            }
+            ( $to_print, $inside_oldtext )
+                = _parse_diffc( $settings, $_, $inside_oldtext );
         }
         elsif ( $type eq 'diffu' ) {
             given ($_) {
