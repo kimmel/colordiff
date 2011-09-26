@@ -5,8 +5,6 @@
 use warnings;
 use strict;
 
-#use diagnostics;
-
 use English qw( -no_match_vars );
 use Getopt::Long qw( GetOptions :config pass_through );
 use Pod::Usage qw( pod2usage );
@@ -19,10 +17,10 @@ use AppConfig::File;
 
 package main;
 
-#pull in Perl 6 given/when
-use feature qw(:5.10);
+#pull in Perl 6 given/when.
+use feature qw( switch );    # Comment this line out for Perl < 5.10
 
-if ( $PERL_VERSION < v5.12 ) {
+if ( $PERL_VERSION < v5.10 ) {
     can_load( modules => { 'Switch' => '2.09', }, verbose => 1 )
         or die "$ERRNO Cannot load module Switch.\n";
 }
@@ -70,7 +68,7 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
 sub show_banner {
     my $display = shift;
 
-    return if ( $display == 0 );
+    return if ( $display eq 'no' );
 
     my $app_name     = 'colordiff';
     my $version      = '2.0.0alpha';
@@ -120,7 +118,10 @@ sub parse_config_file {
     foreach my $v (@boolean_options) {
         $state->define( @{$v}[0],
             { DEFAULT => @{$v}[1], VALIDATE => @{$v}[2] } );
+        $state->{VARIABLE}{ @{$v}[0] }
+            = $state->{VARIABLE}{ @{$v}[0] } eq 'yes' ? 1 : 0;
     }
+
     foreach my $v (@color_codes) {
         $state->define( @{$v}[0],
             { DEFAULT => @{$v}[1], VALIDATE => \&_validate_config_option } );
@@ -130,10 +131,6 @@ sub parse_config_file {
 
     $conf_file->parse( '/etc/colordiffrc', "$ENV{HOME}/.colordiffrc" );
 
-    foreach my $v (@boolean_options) {
-        $state->{VARIABLE}{ @{$v}[0] }
-            = $state->{VARIABLE}{ @{$v}[0] } eq 'yes' ? 1 : 0;
-    }
     foreach my $v (@color_codes) {
         my $key = @{$v}[0];
         $state->{VARIABLE}{$key} = lc $state->{VARIABLE}{$key};
@@ -390,7 +387,7 @@ sub parse_and_print {
 
 # ----------------------------------------------------------------------------
 
-sub run {
+sub main {
     my $specified_difftype;
 
     GetOptions(
@@ -454,7 +451,7 @@ sub run {
     exit $exitcode;
 }
 
-run() unless caller;
+main() unless caller;
 
 __END__
 
