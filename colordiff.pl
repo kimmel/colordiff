@@ -12,6 +12,7 @@ use IPC::Open2;
 use Term::ANSIColor qw(:constants color colorvalid);
 use Module::Load::Conditional qw( can_load );
 use Carp qw( carp croak );
+use Hash::Util qw ( lock_keys );
 
 use AppConfig::File;
 
@@ -53,8 +54,8 @@ DIFF_TYPE: foreach my $record ( @{$input_ref} ) {
 
             # wdiff deleted/added patterns
             # should almost always be pairwaise?
-            when (m/\[-.*?-\]/xs)   { $diff_type = 'wdiff'; }
-            when (m/\{\+.*?\+\}/xs) { $diff_type = 'wdiff'; }
+            when (m/\[-.*?-\]/xs)       { $diff_type = 'wdiff'; }
+            when (m/[{][+].*?[+][}]/xs) { $diff_type = 'wdiff'; }
         }
 
         if ( $diff_type ne 'unknown' ) {
@@ -107,7 +108,7 @@ sub parse_config_file {
         [ 'oldtext',   'red', ],
         [ 'diffstuff', 'magenta', ],
         [ 'cvsstuff',  'green', ],
-        [ 'off',       'off', ],
+        [ 'off',       'clear', ],
     );
     my $state = AppConfig::State->new(
         {   GLOBAL => { ARGCOUNT => 1, },
@@ -116,37 +117,36 @@ sub parse_config_file {
     );
 
     foreach my $v (@boolean_options) {
-        $state->define( @{$v}[0],
-            { DEFAULT => @{$v}[1], VALIDATE => @{$v}[2] } );
-        $state->{VARIABLE}{ @{$v}[0] }
-            = $state->{VARIABLE}{ @{$v}[0] } eq 'yes' ? 1 : 0;
+        $state->define( $v->[0],
+            { DEFAULT => $v->[1], VALIDATE => $v->[2] } );
+        $state->{VARIABLE}{ $v->[0] }
+            = $state->{VARIABLE}{ $v->[0] } eq 'yes' ? 1 : 0;
     }
 
     foreach my $v (@color_codes) {
-        $state->define( @{$v}[0],
-            { DEFAULT => @{$v}[1], VALIDATE => \&_validate_config_option } );
+        $state->define( $v->[0],
+            { DEFAULT => $v->[1], VALIDATE => \&_validate_config_option } );
     }
+    lock_keys( %{ $state->{VARIABLE} } );
 
     my $conf_file = AppConfig::File->new($state);
-
     $conf_file->parse( '/etc/colordiffrc', "$ENV{HOME}/.colordiffrc" );
 
     foreach my $v (@color_codes) {
-        my $key = @{$v}[0];
-        $state->{VARIABLE}{$key} = lc $state->{VARIABLE}{$key};
+        $state->{VARIABLE}{ $v->[0] } = lc $state->{VARIABLE}{ $v->[0] };
 
-        if ( $state->{VARIABLE}{$key} =~ m/\d+/xms ) {
-            if ( $state->{VARIABLE}{$key} < 8 ) {
-                $state->{VARIABLE}{$key}
-                    = "\033[0;3$state->{VARIABLE}{ $key }m";
+        if ( $state->{VARIABLE}{ $v->[0] } =~ m/\d+/xms ) {
+            if ( $state->{VARIABLE}{ $v->[0] } < 8 ) {
+                $state->{VARIABLE}{ $v->[0] }
+                    = "\033[0;3$state->{VARIABLE}{ $v->[0] }m";
             }
-            elsif ( $state->{VARIABLE}{$key} < 15 ) {
-                $state->{VARIABLE}{$key}
-                    = "\033[0;9$state->{VARIABLE}{ $key }m";
+            elsif ( $state->{VARIABLE}{ $v->[0] } < 15 ) {
+                $state->{VARIABLE}{ $v->[0] }
+                    = "\033[0;9$state->{VARIABLE}{ $v->[0] }m";
             }
             else {
-                $state->{VARIABLE}{$key}
-                    = "\033[0;38;5;$state->{VARIABLE}{ $key }m";
+                $state->{VARIABLE}{ $v->[0] }
+                    = "\033[0;38;5;$state->{VARIABLE}{ $v->[0] }m";
             }
         }
     }
@@ -317,17 +317,12 @@ sub _parse_diffy {
     # separator characters
     if ( length($line) > ( $diffy_sep_col + 2 ) ) {
         my $sepchars = substr $line, $diffy_sep_col, 2;
-        if ( $sepchars eq ' <' ) {
-            $to_print = $settings->{oldtext};
-        }
-        elsif ( $sepchars eq ' |' ) {
-            $to_print = $settings->{diffstuff};
-        }
-        elsif ( $sepchars eq ' >' ) {
-            $to_print = $settings->{newtext};
-        }
-        else {
-            $to_print = $settings->{plain};
+
+        given ($sepchars) {
+            when (' <') { $to_print = $settings->{oldtext}; }
+            when (' |') { $to_print = $settings->{diffstuff}; }
+            when (' >') { $to_print = $settings->{newtext}; }
+            default     { $to_print = $settings->{plain}; }
         }
     }
     elsif (m/^Only[ ]in/xms) {
@@ -346,10 +341,13 @@ sub parse_and_print {
     my $type           = shift;
     my $diffy_sep_col  = shift;
     my $inside_oldtext = 1;
-
-    my $to_print = q{};
+    my $color          = \%Term::ANSIColor::ATTRIBUTES;
+    my $oldt           = "\e[$color->{ $settings->{oldtext} }m";
+    my $newt           = "\e[$color->{ $settings->{newtext} }m";
+    my $off            = "\e[$color->{ $settings->{off} }m";
 
     foreach my $chunk (@input) {
+        my $to_print = q{};
         given ($type) {
             when ('diff') { $to_print = _parse_diff( $settings, $chunk ); }
             when ('diffc') {
@@ -361,23 +359,19 @@ sub parse_and_print {
                 $to_print = _parse_diffy( $settings, $chunk, $diffy_sep_col );
             }
             when ('wdiff') {
-                $chunk
-                    =~ s/(\[-[^]]*?-\])/$settings->{oldtext}$1$settings->{off}/gms;
-                $chunk
-                    =~ s/([{][+][^]]*?[+][}])/$settings->{newtext}$1$settings->{off}/gms;
+                $chunk =~ s/(\[-[^]]*?-\])/$oldt$1$off/gxms;
+                $chunk =~ s/([{][+][^]]*?[+][}])/$newt$1$off/gxms;
             }
             when ('debdiff') {
-                $chunk
-                    =~ s/(\[-[^]]*?-\])/$settings->{oldtext}$1$settings->{off}/gms;
-                $chunk
-                    =~ s/([{][+][^]]*?[+][}])/$settings->{newtext}$1$settings->{off}/gms;
+                $chunk =~ s/(\[-[^]]*?-\])/$oldt$1$off/gms;
+                $chunk =~ s/([{][+][^]]*?[+][}])/$newt$1$off/gms;
             }
         }
 
         if ( $to_print =~ m/\d/xms ) {
             print $to_print;
         }
-        else {
+        elsif ( $to_print ne '' ) {
             print color($to_print);
         }
         print $chunk, color('reset');
