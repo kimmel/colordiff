@@ -346,6 +346,8 @@ sub parse_and_print {
     my $newt           = "\e[$color->{ $settings->{newtext} }m";
     my $off            = "\e[$color->{ $settings->{off} }m";
 
+    $type eq 'wdiff' and @input = (join '', @input);
+
     foreach my $chunk (@input) {
         my $to_print = q{};
         given ($type) {
