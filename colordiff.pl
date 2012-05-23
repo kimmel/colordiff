@@ -69,6 +69,26 @@ my @config_files = ("$etcdir/colordiffrc");
 push (@config_files, "$ENV{HOME}/.colordiffrc") if (defined $ENV{HOME});
 my $config_file;
 
+sub check_for_file_arguments {
+    my $nonopts = 0;
+    my $ddash = 0;
+
+    while (my $arg = shift) {
+        if ($arg eq "--") {
+            $ddash = 1;
+            next;
+        }
+        if ($ddash) {
+            $nonopts++;
+            next;
+        }
+        if ($arg !~ /^-/) {
+            $nonopts++;
+        }
+    }
+    return $nonopts;
+}
+
 foreach $config_file (@config_files) {
     if (open (COLORDIFFRC, "<$config_file")) {
         while (<COLORDIFFRC>) {
@@ -166,18 +186,19 @@ if ($show_banner == 1) {
     print STDERR "$copyright $author, $author_email\n\n";
 }
 
-# FIXME - work out some magic here to make it rip off
-# colordiff-specific long options, such as:
-#
-#   --difftype={plain,context,unified,sideside,debdiff}
-#
-# then, optionally, throw away other options if in a pipe
+my $operating_methodology;
+
+if (check_for_file_arguments (@ARGV)) {
+    $operating_methodology = 1; # we have files as arg, so we act as diff
+} else {
+    $operating_methodology = 2; # no files as args, so operate as filter
+}
 
 my @inputstream;
 
 my $exitcode = 0;
-if ((defined $ARGV[0]) || (-t STDIN)) {
-    # More reliable way of pulling in arguments
+if ($operating_methodology == 1) {
+    # Run diff and then post-process the output
     my $pid = open2(\*INPUTSTREAM, undef, "diff", @ARGV);
     @inputstream = <INPUTSTREAM>;
     close INPUTSTREAM;
@@ -185,6 +206,7 @@ if ((defined $ARGV[0]) || (-t STDIN)) {
     $exitcode=$? >> 8;
 }
 else {
+    # No need to call diff, just process standard input
     @inputstream = <STDIN>;
 }
 
