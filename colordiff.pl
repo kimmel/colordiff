@@ -26,11 +26,11 @@ use Getopt::Long qw(:config pass_through);
 use IPC::Open2;
 
 my $app_name     = 'colordiff';
-my $version      = '1.0.9';
+my $version      = '1.0.10';
 my $author       = 'Dave Ewart';
 my $author_email = 'davee@sungate.co.uk';
 my $app_www      = 'http://colordiff.sourceforge.net/';
-my $copyright    = '(C)2002-2009';
+my $copyright    = '(C)2002-2012';
 my $show_banner  = 1;
 my $color_patch  = 0;
 

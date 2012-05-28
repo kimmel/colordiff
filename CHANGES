@@ -97,5 +97,10 @@ Changes between version 1.0.8 and 1.0.9
 
 Fix for http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=513313 incorporated
 
+Changes between version 1.0.9 and 1.0.10
+
+Fix for http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=459763 incorporated,
+thanks to Gergely Nagy for contributed code.
+
 # vim: tw=72
 
