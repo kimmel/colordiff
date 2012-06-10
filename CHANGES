@@ -102,5 +102,9 @@ Changes between version 1.0.9 and 1.0.10
 Fix for http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=459763 incorporated,
 thanks to Gergely Nagy for contributed code.
 
+Changes between version 1.0.10 and 1.0.11
+
+Support for xz in cdiff, patch by Ville Skyttä
+
 # vim: tw=72
 
