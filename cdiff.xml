@@ -35,9 +35,9 @@ in a URL or a file, e.g.</para>
 cdiff http://some.url.com/foo/thing.patch
 </screen>
 
-<para>It also adds support for reading gzip, bzip2 and lzma compressed diffs,
-and like colordiff, also supports reading diffs from standard input if URL
-or a filename is not specified.  &cdiff; pipes colordiff's output through
+<para>It also adds support for reading gzip, bzip2, xz, and lzma compressed
+diffs, and like colordiff, also supports reading diffs from standard input if
+URL or a filename is not specified.  &cdiff; pipes colordiff's output through
 less -R.</para>
 
 </refsect1>

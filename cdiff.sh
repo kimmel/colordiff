@@ -2,7 +2,7 @@
 
 # cdiff.sh - Convenience wrapper for colordiff
 #
-# Copyright (C) 2003-2004 Ville Skyttä <ville.skytta@iki.fi>
+# Copyright (C) 2003-2009 Ville Skyttä <ville.skytta@iki.fi>
 # Based on cdiff version 1.4 by eivind@FreeBSD.org
 #
 # This program is free software; you can redistribute it and/or
@@ -23,9 +23,9 @@
     while [ "$1" != "" ]; do
         file=`echo "$1" | perl -pe 's|^file:/+|/|i'`
         case "$file" in
-            *.bz2)   cat="bzip2 -dcf" ;;
-            *.lzma)  cat="lzma -dc"   ;;
-            *)       cat="gzip -dcf"  ;;
+            *.bz2)       cat="bzip2 -dcf" ;;
+            *.xz|*.lzma) cat="xz -dc"     ;;
+            *)           cat="gzip -dcf"  ;;
         esac
         case `echo "$file" | perl -ne 'print lc $_'` in
         http:*|https:*|ftp:*)
