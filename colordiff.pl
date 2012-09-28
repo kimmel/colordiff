@@ -69,6 +69,18 @@ my @config_files = ("$etcdir/colordiffrc");
 push (@config_files, "$ENV{HOME}/.colordiffrc") if (defined $ENV{HOME});
 my $config_file;
 
+# Convert tabs to spaces
+sub expand_tabs_to_spaces ($) {
+    my ($s) = @_;
+    while ((my $i = index ($s, "\t")) > -1) {
+        substr (
+            $s, $i, 1,    # range to replace
+            (' ' x (8 - ($i % 8))),    # string to replace with
+            );
+    }
+    $s;
+}
+
 sub check_for_file_arguments {
     my $nonopts = 0;
     my $ddash = 0;
@@ -251,12 +263,9 @@ DIFF_TYPE: foreach $record (@inputstream) {
         last DIFF_TYPE;
     }
     # wdiff deleted/added patterns
-    # should almost always be pairwaise?
-    elsif ($record =~ /\[-.*?-\]/s) {
-        $diff_type = 'wdiff';
-        last DIFF_TYPE;
-    }
-    elsif ($record =~ /\{\+.*?\+\}/s) {
+    # should almost always be pairwise?
+    elsif ($record =~ /\[-.*?-\]/s
+           || $record =~ /\{\+.*?\+\}/s) {
         $diff_type = 'wdiff';
         last DIFF_TYPE;
     }
@@ -280,14 +289,7 @@ if ($diff_type eq 'diffy') {
     # Not very elegant, but does the job
     # Unfortunately requires parsing the input stream multiple times
     foreach (@inputstream) {
-        # Convert tabs to spaces
-        while ((my $i = index ($_, "\t")) > -1) {
-            substr (
-                $_, $i, 1,    # range to replace
-                (' ' x (8 - ($i % 8))),    # string to replace with
-            );
-        }
-        $record = $_;
+        $record = expand_tabs_to_spaces $_;
         $longest_record = length ($record) if (length ($record) > $longest_record);
     }
     for (my $i = 0 ; $i <= $longest_record ; $i++) {
@@ -296,25 +298,15 @@ if ($diff_type eq 'diffy') {
     }
 
     foreach (@inputstream) {
-        # Convert tabs to spaces
-        while ((my $i = index ($_, "\t")) > -1) {
-            substr (
-                $_, $i, 1,    # range to replace
-                (' ' x (8 - ($i % 8))),    # string to replace with
-            );
-        }
+        $_ = expand_tabs_to_spaces $_;
         for (my $i = 0 ; $i < (length ($_) - 2) ; $i++) {
             next if (!defined $separator_col{$i});
             next if ($separator_col{$i} == 0);
             my $subsub = substr ($_, $i, 2);
-            if (   ($subsub ne '  ')
-                && ($subsub ne ' |')
-                && ($subsub ne ' >')
-                && ($subsub ne ' <'))
-            {
+            if ($subsub !~ / [ |<>]/) {
                 $separator_col{$i} = 0;
             }
-            if (($subsub eq ' |') || ($subsub eq ' >') || ($subsub eq ' <')) {
+            if ($subsub =~ / [|<>]/) {
                 $candidate_col{$i}++;
             }
         }
