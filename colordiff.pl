@@ -33,6 +33,7 @@ my $app_www      = 'http://colordiff.sourceforge.net/';
 my $copyright    = '(C)2002-2012';
 my $show_banner  = 1;
 my $color_patch  = 0;
+my $diff_cmd     = "diff";
 
 # ANSI sequences for colours
 my %colour;
@@ -126,6 +127,10 @@ foreach $config_file (@config_files) {
                 }
                 next;
             }
+            if ($setting eq 'diff_cmd') {
+                $diff_cmd = $value;
+                next;
+            }
             $setting =~ tr/A-Z/a-z/;
             $value   =~ tr/A-Z/a-z/;
             if (($value eq 'normal') || ($value eq 'none')) {
@@ -211,7 +216,7 @@ my @inputstream;
 my $exitcode = 0;
 if ($operating_methodology == 1) {
     # Run diff and then post-process the output
-    my $pid = open2(\*INPUTSTREAM, undef, "diff", @ARGV);
+    my $pid = open2(\*INPUTSTREAM, undef, "$diff_cmd", @ARGV);
     @inputstream = <INPUTSTREAM>;
     close INPUTSTREAM;
     waitpid $pid, 0;
