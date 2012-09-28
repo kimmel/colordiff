@@ -104,7 +104,8 @@ thanks to Gergely Nagy for contributed code.
 
 Changes between version 1.0.10 and 1.0.11
 
-Support for xz in cdiff, patch by Ville Skyttä
+Support for xz in cdiff, patch by Ville Skyttä; code cleanup from Akim Demaille;
+patch to provide custom diff command from Rainer Nagel.
 
 # vim: tw=72
 
