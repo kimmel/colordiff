@@ -437,12 +437,12 @@ foreach (@inputstream) {
         }
     }
     elsif ($diff_type eq 'wdiff') {
-        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
-        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
+        $_ =~ s/(\[-.+?-\])/$file_old$1$colour{off}/g;
+        $_ =~ s/(\{\+.+?\+\})/$file_new$1$colour{off}/g;
     }
     elsif ($diff_type eq 'debdiff') {
-        $_ =~ s/(\[-[^]]*?-\])/$file_old$1$colour{off}/g;
-        $_ =~ s/(\{\+[^]]*?\+\})/$file_new$1$colour{off}/g;
+        $_ =~ s/(\[-.+?-\])/$file_old$1$colour{off}/g;
+        $_ =~ s/(\{\+.+?\+\})/$file_new$1$colour{off}/g;
     }
     s/$/$colour{off}/;
     print "$_";
