@@ -242,9 +242,9 @@ DIFF_TYPE: foreach $record (@inputstream) {
         $diff_type = $specified_difftype;
         last DIFF_TYPE;
     }
-    # Unified diffs are the only flavour having '+++' or '---'
+    # Unified diffs are the only flavour having '+++ ' or '--- '
     # at the start of a line
-    if ($record =~ /^(\+\+\+|---|@@)/) {
+    if ($record =~ /^(\+\+\+ |--- |@@ )/) {
         $diff_type = 'diffu';
         last DIFF_TYPE;
     }
@@ -272,6 +272,13 @@ DIFF_TYPE: foreach $record (@inputstream) {
     elsif ($record =~ /\[-.*?-\]/s
            || $record =~ /\{\+.*?\+\}/s) {
         $diff_type = 'wdiff';
+        last DIFF_TYPE;
+    }
+    # FIXME - This is a bit risky, but if we haven't matched any other
+    # diff type by this stage, this line usually indicates we have
+    # debdiff output
+    elsif ($record =~ /^Control files: lines which differ/) {
+        $diff_type = 'debdiff';
         last DIFF_TYPE;
     }
 }
