@@ -1,7 +1,7 @@
 INSTALL_DIR=/usr/local/bin
 MAN_DIR=/usr/local/man/man1
 ETC_DIR=/etc
-VERSION=1.0.10
+VERSION=1.0.11
 DIST_FILES=COPYING INSTALL Makefile README \
 	colordiff.pl colordiffrc colordiffrc-lightbg cdiff.sh BUGS TODO CHANGES colordiff.1 \
 	colordiff.xml cdiff.xml cdiff.1
